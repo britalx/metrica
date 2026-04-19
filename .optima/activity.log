@@ -2,3 +2,4 @@
 [2026-04-19 14:01:11] [.optima] DISCUSSION_PROMPT: #1 — from @Rose-Bright
 [2026-04-19 14:11:11] [.optima] DISCUSSION_PROMPT: #1 — from @britalx
 [2026-04-19 14:19:44] [.optima] PICKED_UP: setup-metrica-in-windows.md
+[2026-04-19 14:21:40] [.optima] COMPLETED: setup-metrica-in-windows.md — Installed missing 'schedule' dependency, installed metrica in editable mode (pip install -e .), verified full pipeline end-to-end on Windows: mock data generation (1000 customers, 6 source tables), ET
