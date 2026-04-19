@@ -1,0 +1,56 @@
+metric_id: support_calls_trend
+name: Support Calls Trend (3 Months)
+description: >
+  Slope of support call volume over the last 3 months. Positive values
+  indicate escalating support needs — a strong churn signal when combined
+  with other distress indicators.
+domain: customer_service
+owner: Customer Support
+refresh_cadence: daily
+data_type: float
+unit: slope
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+
+source_mappings:
+  - source_system: contact_center
+    source_table: contact_center_interactions
+    source_fields:
+      - interaction_date
+    transformation: >
+      -- PLACEHOLDER: slope calculation requires window functions over 3 monthly aggregates
+      -- Real source would compute linear regression of monthly call counts
+      SELECT customer_id, NULL::FLOAT AS support_calls_trend
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: support_calls_trend
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - contact_center.interaction_date
+  downstream_consumers:
+    - ml_feature:support_calls_trend
+    - metric:service_distress_index
+
+dq_rules:
+  - rule_id: support_calls_trend_completeness
+    name: All customers have a support calls trend
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE support_calls_trend IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: support_calls_trend_validity
+    name: Support calls trend is within plausible range
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE support_calls_trend < -50 OR support_calls_trend > 50)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

@@ -1,0 +1,60 @@
+metric_id: plan_tier
+name: Plan Tier
+description: >
+  Customer's current plan tier encoded as integer: 1=Basic, 2=Mid, 3=Premium.
+  Plan tier influences churn patterns — basic plan customers are more price-sensitive.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: integer
+unit: tier
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - plan_code
+    transformation: >
+      SELECT customer_id,
+             CASE
+               WHEN plan_code LIKE 'BASIC%' THEN 1
+               WHEN plan_code LIKE 'MID%' THEN 2
+               WHEN plan_code LIKE 'PREM%' THEN 3
+               ELSE 2
+             END AS plan_tier
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: plan_tier
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.plan_code
+  downstream_consumers:
+    - ml_feature:plan_tier
+    - metric:cohort_churn_rate
+    - dashboard:plan_analysis
+
+dq_rules:
+  - rule_id: plan_tier_completeness
+    name: All customers have a plan tier
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE plan_tier IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: plan_tier_validity
+    name: Plan tier is 1, 2, or 3
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE plan_tier NOT IN (1, 2, 3))::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

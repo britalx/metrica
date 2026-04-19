@@ -1,0 +1,56 @@
+metric_id: calls_per_day
+name: Average Daily Call Frequency
+description: >
+  Average number of calls per day over the last 30 days.
+  Measures voice engagement intensity and call behavior patterns.
+domain: usage_behavior
+owner: Data Engineering
+refresh_cadence: daily
+data_type: float
+unit: calls
+version: 1
+status: active
+tags:
+  - churn_feature
+  - usage_behavior
+
+source_mappings:
+  - source_system: cdr
+    source_table: cdr_call_records
+    source_fields:
+      - call_start_time
+    transformation: >
+      SELECT customer_id,
+             COUNT(*)::FLOAT / 30.0 AS calls_per_day
+      FROM raw.cdr_call_records
+      WHERE call_date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: calls_per_day
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - cdr.call_start_time
+  downstream_consumers:
+    - ml_feature:calls_per_day
+    - dashboard:usage_summary
+
+dq_rules:
+  - rule_id: calls_per_day_completeness
+    name: All active customers have a calls per day value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE calls_per_day IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: calls_per_day_validity
+    name: Calls per day is non-negative and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE calls_per_day < 0 OR calls_per_day > 200)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

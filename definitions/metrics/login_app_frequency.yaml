@@ -1,0 +1,57 @@
+metric_id: login_app_frequency
+name: App Login Frequency (Weekly Average)
+description: >
+  Average number of app logins per week over the last 30 days.
+  Low app engagement is a leading indicator of disengagement and churn.
+domain: behavioral_engagement
+owner: Product Analytics
+refresh_cadence: daily
+data_type: float
+unit: logins/week
+version: 1
+status: active
+tags:
+  - churn_feature
+  - engagement
+  - app
+
+source_mappings:
+  - source_system: app_events
+    source_table: app_events
+    source_fields:
+      - login_event
+    transformation: >
+      SELECT customer_id,
+             COUNT(CASE WHEN event_type = 'login' THEN 1 END)::FLOAT / 4.3
+             AS login_app_frequency
+      FROM raw.app_events
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: login_app_frequency
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - app.login_event
+  downstream_consumers:
+    - ml_feature:login_app_frequency
+    - dashboard:engagement_overview
+
+dq_rules:
+  - rule_id: login_app_frequency_completeness
+    name: All customers have a login frequency value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE login_app_frequency IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.70
+    fail_threshold: 0.50
+
+  - rule_id: login_app_frequency_validity
+    name: Login frequency is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE login_app_frequency < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

@@ -1,0 +1,56 @@
+metric_id: feature_adoption_count
+name: Feature Adoption Count
+description: >
+  Count of distinct services actively used by the customer (voicemail, hotspot,
+  international calling, etc.). Higher adoption increases switching cost and
+  reduces churn propensity.
+domain: usage_behavior
+owner: Product Analytics
+refresh_cadence: weekly
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - usage_behavior
+  - stickiness
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: provisioned_services not in mock data
+      -- Real source: COUNT(DISTINCT service_code) FROM raw.crm_provisioned_services
+      SELECT customer_id, NULL::INTEGER AS feature_adoption_count
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: feature_adoption_count
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:feature_adoption_count
+    - metric:value_to_cost_ratio
+    - metric:stickiness_score
+
+dq_rules:
+  - rule_id: feature_adoption_count_completeness
+    name: All active customers have a feature adoption count
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE feature_adoption_count IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: feature_adoption_count_validity
+    name: Feature adoption count is non-negative and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE feature_adoption_count < 0 OR feature_adoption_count > 50)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

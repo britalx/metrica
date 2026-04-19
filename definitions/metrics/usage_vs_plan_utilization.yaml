@@ -1,0 +1,58 @@
+metric_id: usage_vs_plan_utilization
+name: Usage vs Plan Utilization Ratio
+description: >
+  Actual data usage divided by plan data allowance — ratio 0.0 to 1.0+.
+  Under-utilization may indicate plan mismatch, over-utilization leads to
+  overages and dissatisfaction.
+domain: behavioral_engagement
+owner: Product Analytics
+refresh_cadence: daily
+data_type: float
+unit: ratio
+version: 1
+status: active
+tags:
+  - churn_feature
+  - engagement
+
+source_mappings:
+  - source_system: cdr
+    source_table: cdr_call_records
+    source_fields:
+      - data_bytes
+    transformation: >
+      SELECT customer_id,
+             COALESCE(SUM(data_bytes)::FLOAT / (1024.0*1024*1024) / 5.0, 0)
+             AS usage_vs_plan_utilization
+      FROM raw.cdr_call_records
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: usage_vs_plan_utilization
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - cdr.data_bytes_transferred
+    - crm.plan_data_allowance
+  downstream_consumers:
+    - ml_feature:usage_vs_plan_utilization
+    - dashboard:plan_fit_analysis
+
+dq_rules:
+  - rule_id: usage_vs_plan_utilization_completeness
+    name: All customers have a utilization ratio
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE usage_vs_plan_utilization IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: usage_vs_plan_utilization_validity
+    name: Utilization ratio is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE usage_vs_plan_utilization < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

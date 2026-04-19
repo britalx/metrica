@@ -1,0 +1,12 @@
+cde_id: cdr.call_date
+name: Call Date
+description: >
+  Date when a voice call was placed. Primary time dimension for usage trend
+  metrics and daily call frequency calculations.
+source_system: cdr
+source_field: call_date
+data_type: date
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

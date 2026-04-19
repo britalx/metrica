@@ -1,0 +1,58 @@
+metric_id: unresolved_tickets_count
+name: Unresolved Tickets Count
+description: >
+  Count of currently open or unresolved support tickets for the customer.
+  Multiple unresolved tickets indicate ongoing service issues and elevated
+  churn risk.
+domain: customer_service
+owner: Customer Support
+refresh_cadence: daily
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - ticket_status
+    transformation: >
+      -- PLACEHOLDER: ticket table not in mock data
+      -- Real source: SELECT customer_id, COUNT(*) AS unresolved_tickets_count
+      --              FROM raw.crm_tickets WHERE status IN ('open', 'in_progress')
+      --              GROUP BY customer_id
+      SELECT customer_id, NULL::INTEGER AS unresolved_tickets_count
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: unresolved_tickets_count
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.ticket_status
+  downstream_consumers:
+    - ml_feature:unresolved_tickets_count
+    - metric:service_distress_index
+
+dq_rules:
+  - rule_id: unresolved_tickets_count_completeness
+    name: All customers have an unresolved tickets count
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE unresolved_tickets_count IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: unresolved_tickets_count_validity
+    name: Unresolved tickets count is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE unresolved_tickets_count < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

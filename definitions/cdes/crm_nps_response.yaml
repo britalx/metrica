@@ -1,0 +1,12 @@
+cde_id: crm.nps_response
+name: NPS Response
+description: >
+  Net Promoter Score from the customer's most recent survey response.
+  Ranges from -100 to 100. Strong predictor of retention intent.
+source_system: crm
+source_field: nps_response
+data_type: integer
+business_owner: Customer Experience
+sensitivity: confidential
+update_frequency: monthly
+nullable: true

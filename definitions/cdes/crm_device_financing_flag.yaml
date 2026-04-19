@@ -1,0 +1,12 @@
+cde_id: crm.device_financing_flag
+name: Device Financing Flag
+description: >
+  Boolean indicating whether the customer is currently on a device installment
+  payment plan. Device financing increases switching cost and reduces churn risk.
+source_system: crm
+source_field: device_financing_flag
+data_type: boolean
+business_owner: Customer Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

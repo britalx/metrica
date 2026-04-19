@@ -1,0 +1,54 @@
+metric_id: speed_test_avg_mbps
+name: Average Speed Test (Mbps)
+description: >
+  Average data speed in Mbps from in-app speed tests (if available).
+  Low speed test results correlate with network satisfaction issues.
+domain: network_quality
+owner: Network Operations
+refresh_cadence: weekly
+data_type: float
+unit: Mbps
+version: 1
+status: active
+tags:
+  - churn_feature
+  - network
+  - app
+
+source_mappings:
+  - source_system: network
+    source_table: network_measurements
+    source_fields: []
+    transformation: >
+      SELECT customer_id,
+             AVG(speed_mbps) AS speed_test_avg_mbps
+      FROM raw.network_measurements
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: speed_test_avg_mbps
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:speed_test_avg_mbps
+    - dashboard:network_quality
+
+dq_rules:
+  - rule_id: speed_test_avg_mbps_completeness
+    name: Customers with speed tests have an average speed value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE speed_test_avg_mbps IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.50
+    fail_threshold: 0.30
+
+  - rule_id: speed_test_avg_mbps_validity
+    name: Speed test average is non-negative and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE speed_test_avg_mbps < 0 OR speed_test_avg_mbps > 10000)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

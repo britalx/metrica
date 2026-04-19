@@ -1,0 +1,12 @@
+cde_id: app.login_event
+name: App Login Event
+description: >
+  Timestamp of a customer login event in the self-service mobile app.
+  Used to measure digital engagement frequency.
+source_system: app_events
+source_field: login_event
+data_type: timestamp
+business_owner: Digital Products
+sensitivity: internal
+update_frequency: daily
+nullable: false

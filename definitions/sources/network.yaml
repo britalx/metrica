@@ -1,0 +1,7 @@
+source_id: network
+name: Network Operations
+description: >
+  Network operations center data including signal measurements, outage events,
+  cell tower performance, and throttling policy enforcement records.
+system_type: database
+connection_hint: dwh.network_measurements

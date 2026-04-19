@@ -1,0 +1,61 @@
+metric_id: avg_ticket_resolution_days
+name: Average Ticket Resolution Days
+description: >
+  Average number of days to resolve a support ticket over the last 6 months.
+  Slow resolution times erode customer trust and increase churn propensity.
+domain: customer_service
+owner: Customer Support
+refresh_cadence: weekly
+data_type: float
+unit: days
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - ticket_created_at
+      - ticket_resolved_at
+    transformation: >
+      -- PLACEHOLDER: ticket table not in mock data
+      -- Real source: SELECT customer_id,
+      --              AVG(DATEDIFF('day', created_at, resolved_at)) AS avg_ticket_resolution_days
+      --              FROM raw.crm_tickets WHERE resolved_at IS NOT NULL
+      --              AND created_at >= CURRENT_DATE - INTERVAL '6 months'
+      --              GROUP BY customer_id
+      SELECT customer_id, NULL::FLOAT AS avg_ticket_resolution_days
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: avg_ticket_resolution_days
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.ticket_created_at
+    - crm.ticket_resolved_at
+  downstream_consumers:
+    - ml_feature:avg_ticket_resolution_days
+    - dashboard:service_quality
+
+dq_rules:
+  - rule_id: avg_ticket_resolution_days_completeness
+    name: All customers with tickets have a resolution time
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE avg_ticket_resolution_days IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: avg_ticket_resolution_days_validity
+    name: Resolution days is non-negative and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE avg_ticket_resolution_days < 0 OR avg_ticket_resolution_days > 365)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

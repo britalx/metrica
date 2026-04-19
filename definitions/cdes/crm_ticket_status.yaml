@@ -1,0 +1,12 @@
+cde_id: crm.ticket_status
+name: Ticket Status
+description: >
+  Current status of a support ticket. Values include open, closed, pending,
+  and escalated. Used to compute unresolved ticket counts.
+source_system: crm
+source_field: ticket_status
+data_type: string
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: daily
+nullable: false

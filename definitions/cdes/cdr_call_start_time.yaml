@@ -1,0 +1,12 @@
+cde_id: cdr.call_start_time
+name: Call Start Time
+description: >
+  Precise timestamp when a call started. Used to determine time-of-day
+  patterns and daily call frequency.
+source_system: cdr
+source_field: call_start_time
+data_type: timestamp
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

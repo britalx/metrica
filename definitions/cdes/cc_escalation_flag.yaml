@@ -1,0 +1,12 @@
+cde_id: cc.escalation_flag
+name: Escalation Flag
+description: >
+  Boolean indicating whether a contact center interaction was escalated
+  to a supervisor. Escalation signals high-friction customer experience.
+source_system: contact_center
+source_field: escalation_flag
+data_type: boolean
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: daily
+nullable: false

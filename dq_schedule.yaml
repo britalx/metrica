@@ -1,0 +1,36 @@
+# DQ Schedule Configuration
+# Controls when DQ checks run and how results are handled
+
+schedule:
+  # How often to run (used in daemon mode)
+  interval_minutes: 60
+
+  # Cron expression (for reference / cron setup instructions)
+  cron_expression: "0 * * * *"   # every hour
+
+  # Run immediately on startup in daemon mode?
+  run_on_start: true
+
+database:
+  path: data/metrica_mock.duckdb
+
+definitions:
+  root: definitions/
+
+alerts:
+  # Where to write alert files
+  output_dir: .alerts/
+
+  # Write a summary file after every run (pass or not)?
+  write_always: false
+
+  # Always write on WARN or FAIL
+  write_on_warn: true
+  write_on_fail: true
+
+  # Print scorecard to stdout on every run?
+  print_scorecard: true
+
+pipeline:
+  # Run ETL before DQ checks on every scheduled run?
+  run_before_dq: false

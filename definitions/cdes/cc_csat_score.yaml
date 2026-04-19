@@ -1,0 +1,12 @@
+cde_id: cc.csat_score
+name: CSAT Score
+description: >
+  Customer satisfaction score collected after a contact center interaction.
+  Integer scale from 1 (very dissatisfied) to 5 (very satisfied).
+source_system: contact_center
+source_field: csat_score
+data_type: integer
+business_owner: Customer Support
+sensitivity: confidential
+update_frequency: daily
+nullable: true

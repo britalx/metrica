@@ -1,0 +1,66 @@
+metric_id: avg_monthly_minutes
+name: Average Monthly Call Minutes
+description: >
+  Average call minutes per month over the last 3 months.
+  Primary usage engagement signal for churn prediction — declining minutes
+  often precedes voluntary churn.
+domain: usage_behavior
+owner: Data Engineering
+refresh_cadence: daily
+data_type: float
+unit: minutes
+version: 1
+status: active
+tags:
+  - churn_feature
+  - usage_behavior
+  - ml_ready
+
+source_mappings:
+  - source_system: cdr
+    source_table: cdr_call_records
+    source_fields:
+      - call_duration
+      - call_date
+    transformation: >
+      SELECT customer_id,
+             AVG(monthly_minutes) AS avg_monthly_minutes
+      FROM (
+          SELECT customer_id,
+                 DATE_TRUNC('month', call_date) AS month,
+                 SUM(duration_seconds) / 60.0 AS monthly_minutes
+          FROM raw.cdr_call_records
+          WHERE call_date >= CURRENT_DATE - INTERVAL '90 days'
+          GROUP BY customer_id, DATE_TRUNC('month', call_date)
+      ) monthly
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: avg_monthly_minutes
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - cdr.call_duration
+    - cdr.call_date
+  downstream_consumers:
+    - ml_feature:avg_monthly_minutes
+    - dashboard:usage_summary
+
+dq_rules:
+  - rule_id: avg_monthly_minutes_completeness
+    name: All active customers have a minutes value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE avg_monthly_minutes IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: avg_monthly_minutes_validity
+    name: Minutes value is non-negative and within plausible range
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE avg_monthly_minutes < 0 OR avg_monthly_minutes > 10000)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

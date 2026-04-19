@@ -1,0 +1,58 @@
+metric_id: days_since_last_login
+name: Days Since Last Login
+description: >
+  Number of days since the customer last logged into the app or web portal.
+  Extended absence from digital channels signals disengagement.
+domain: behavioral_engagement
+owner: Product Analytics
+refresh_cadence: daily
+data_type: integer
+unit: days
+version: 1
+status: active
+tags:
+  - churn_feature
+  - engagement
+  - app
+
+source_mappings:
+  - source_system: app_events
+    source_table: app_events
+    source_fields:
+      - login_event
+    transformation: >
+      SELECT customer_id,
+             CAST(DATEDIFF('day',
+                  MAX(CASE WHEN event_type = 'login' THEN event_date END),
+                  DATE '2026-03-15') AS INTEGER) AS days_since_last_login
+      FROM raw.app_events
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: days_since_last_login
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - app.login_event
+  downstream_consumers:
+    - ml_feature:days_since_last_login
+    - dashboard:engagement_overview
+
+dq_rules:
+  - rule_id: days_since_last_login_completeness
+    name: All customers have a days since last login value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE days_since_last_login IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.70
+    fail_threshold: 0.50
+
+  - rule_id: days_since_last_login_validity
+    name: Days since last login is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE days_since_last_login < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

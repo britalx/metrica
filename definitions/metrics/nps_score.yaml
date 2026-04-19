@@ -1,0 +1,57 @@
+metric_id: nps_score
+name: Net Promoter Score
+description: >
+  Net Promoter Score from the customer's last survey response (-100 to 100 scale).
+  NPS is a key loyalty indicator — detractors (score 0-6) are at elevated churn risk.
+domain: customer_service
+owner: Customer Experience
+refresh_cadence: monthly
+data_type: integer
+unit: score
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+  - loyalty
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - nps_response
+    transformation: >
+      SELECT customer_id,
+             nps_response AS nps_score
+      FROM raw.crm_customers
+      WHERE nps_response IS NOT NULL
+    target_table: metrics.customer_metrics
+    target_column: nps_score
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.nps_response
+  downstream_consumers:
+    - ml_feature:nps_score
+    - metric:service_distress_index
+    - dashboard:customer_experience
+
+dq_rules:
+  - rule_id: nps_score_completeness
+    name: Most customers have an NPS response
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE nps_score IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.70
+    fail_threshold: 0.50
+
+  - rule_id: nps_score_validity
+    name: NPS score is between 0 and 10
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE nps_score < 0 OR nps_score > 10)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

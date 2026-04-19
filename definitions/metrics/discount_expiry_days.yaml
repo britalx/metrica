@@ -1,0 +1,56 @@
+metric_id: discount_expiry_days
+name: Days Until Discount Expiry
+description: >
+  Number of days until the customer's current promotional discount expires.
+  Customers approaching discount expiry are at elevated churn risk.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: daily
+data_type: integer
+unit: days
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - promotion
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: discount_end_date not in mock data
+      -- Real source: SELECT customer_id,
+      --              DATEDIFF('day', CURRENT_DATE, discount_end_date) AS discount_expiry_days
+      --              FROM raw.billing_promotions WHERE discount_end_date >= CURRENT_DATE
+      SELECT customer_id, NULL::INTEGER AS discount_expiry_days
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: discount_expiry_days
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:discount_expiry_days
+    - dashboard:promotion_risk
+
+dq_rules:
+  - rule_id: discount_expiry_days_completeness
+    name: Customers with active discounts have an expiry value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE discount_expiry_days IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: discount_expiry_days_validity
+    name: Discount expiry days is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE discount_expiry_days < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

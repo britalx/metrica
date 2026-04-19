@@ -1,0 +1,55 @@
+metric_id: referral_made
+name: Referral Made
+description: >
+  Whether the customer has referred at least one person. Customers who
+  refer others are brand advocates with significantly lower churn rates.
+domain: behavioral_engagement
+owner: Marketing
+refresh_cadence: weekly
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - engagement
+  - loyalty
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - referral_flag
+    transformation: >
+      SELECT customer_id,
+             referral_flag AS referral_made
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: referral_made
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.referral_flag
+  downstream_consumers:
+    - ml_feature:referral_made
+    - dashboard:engagement_overview
+
+dq_rules:
+  - rule_id: referral_made_completeness
+    name: All customers have a referral flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE referral_made IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: referral_made_validity
+    name: Referral flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE referral_made NOT IN (TRUE, FALSE) AND referral_made IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

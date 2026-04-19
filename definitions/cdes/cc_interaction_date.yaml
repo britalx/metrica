@@ -1,0 +1,13 @@
+# CDE: interaction_date — date/time of support interaction
+cde_id: contact_center.interaction_date
+name: Support Interaction Date
+description: >
+  Timestamp of each customer support interaction (call, chat, email).
+  Used to compute rolling support contact counts and trends.
+source_system: contact_center
+source_field: interaction_date
+data_type: timestamp
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: hourly
+nullable: false

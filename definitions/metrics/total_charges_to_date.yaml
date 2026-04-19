@@ -1,0 +1,56 @@
+metric_id: total_charges_to_date
+name: Total Charges to Date
+description: >
+  Cumulative lifetime revenue from the customer across all invoices.
+  Measures overall customer value and helps segment high-value accounts at churn risk.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: monthly
+data_type: float
+unit: USD
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - revenue
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields:
+      - invoice_amount
+    transformation: >
+      SELECT customer_id,
+             SUM(total_amount) AS total_charges_to_date
+      FROM raw.billing_invoices
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: total_charges_to_date
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - billing.invoice_amount
+  downstream_consumers:
+    - ml_feature:total_charges_to_date
+    - dashboard:revenue_overview
+
+dq_rules:
+  - rule_id: total_charges_to_date_completeness
+    name: All customers have a total charges value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE total_charges_to_date IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: total_charges_to_date_validity
+    name: Total charges is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE total_charges_to_date < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

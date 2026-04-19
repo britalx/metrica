@@ -1,0 +1,55 @@
+metric_id: value_to_cost_ratio
+name: Value-to-Cost Ratio
+description: >
+  Feature adoption count divided by monthly charges. Lower ratios indicate
+  customers paying more for less perceived value — a churn risk signal.
+domain: derived_engineered
+owner: Data Science
+refresh_cadence: daily
+data_type: float
+unit: ratio
+version: 1
+status: active
+tags:
+  - churn_feature
+  - derived
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- Derived from metrics layer (not raw sources)
+      SELECT customer_id,
+             feature_adoption_count / NULLIF(monthly_charges, 0) AS value_to_cost_ratio
+      FROM metrics.customer_metrics
+    target_table: metrics.customer_metrics
+    target_column: value_to_cost_ratio
+
+lineage:
+  upstream_metrics:
+    - feature_adoption_count
+    - monthly_charges
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:value_to_cost_ratio
+    - dashboard:customer_value
+
+dq_rules:
+  - rule_id: value_to_cost_ratio_completeness
+    name: All customers have a value-to-cost ratio
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE value_to_cost_ratio IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.70
+    fail_threshold: 0.50
+
+  - rule_id: value_to_cost_ratio_validity
+    name: Value-to-cost ratio is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE value_to_cost_ratio < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

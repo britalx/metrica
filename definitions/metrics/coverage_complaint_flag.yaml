@@ -1,0 +1,58 @@
+metric_id: coverage_complaint_flag
+name: Coverage Complaint Flag
+description: >
+  Whether the customer has ever filed a coverage-related complaint.
+  Coverage complaints strongly predict network-driven churn.
+domain: network_quality
+owner: Network Operations
+refresh_cadence: daily
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - network
+  - complaint
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - complaint_category
+    transformation: >
+      -- PLACEHOLDER: complaint_category not queryable in mock data
+      -- Real source: SELECT customer_id,
+      --              BOOL_OR(complaint_category = 'coverage') AS coverage_complaint_flag
+      --              FROM raw.crm_complaints GROUP BY customer_id
+      SELECT customer_id, NULL::BOOLEAN AS coverage_complaint_flag
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: coverage_complaint_flag
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.complaint_category
+  downstream_consumers:
+    - ml_feature:coverage_complaint_flag
+    - dashboard:network_quality
+
+dq_rules:
+  - rule_id: coverage_complaint_flag_completeness
+    name: All customers have a coverage complaint flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE coverage_complaint_flag IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: coverage_complaint_flag_validity
+    name: Coverage complaint flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE coverage_complaint_flag NOT IN (TRUE, FALSE) AND coverage_complaint_flag IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

@@ -1,0 +1,8 @@
+# Source System: CRM (Customer Relationship Management)
+source_id: crm
+name: CRM System
+description: >
+  Primary customer relationship management system. Contains customer profiles,
+  account details, activation dates, contract information, and service history.
+system_type: database
+connection_hint: dwh.crm_customers

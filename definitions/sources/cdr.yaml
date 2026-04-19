@@ -1,0 +1,8 @@
+source_id: cdr
+name: Call Detail Records
+description: >
+  Call detail record system capturing all voice, SMS, and data usage events.
+  Primary source for usage behavior metrics including call duration, data
+  consumption, and roaming activity.
+system_type: database
+connection_hint: dwh.cdr_call_records

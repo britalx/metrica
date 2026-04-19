@@ -1,0 +1,12 @@
+cde_id: crm.paperless_flag
+name: Paperless Billing Flag
+description: >
+  Boolean indicating whether the customer is enrolled in paperless billing.
+  Digital engagement signal that correlates with lower churn risk.
+source_system: crm
+source_field: paperless_flag
+data_type: boolean
+business_owner: Customer Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

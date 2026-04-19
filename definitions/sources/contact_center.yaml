@@ -1,0 +1,8 @@
+# Source System: Contact Center
+source_id: contact_center
+name: Contact Center System
+description: >
+  Customer support ticketing and interaction system. Contains support calls,
+  tickets, resolution data, NPS/CSAT scores, escalations, and IVR logs.
+system_type: database
+connection_hint: dwh.contact_center_interactions

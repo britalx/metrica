@@ -1,0 +1,62 @@
+# Metric: tenure_months
+# Domain: Contract & Account
+# Source: CRM activation_date
+
+metric_id: tenure_months
+name: Customer Tenure (Months)
+description: >
+  Number of complete months since the customer's account activation date.
+  Core retention metric and key predictor of churn propensity — longer tenure
+  generally correlates with lower churn risk.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: integer
+unit: months
+version: 1
+status: active
+tags:
+  - churn_feature
+  - retention
+  - contract
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - activation_date
+    transformation: >
+      EXTRACT(YEAR FROM AGE(CURRENT_DATE, activation_date)) * 12 +
+      EXTRACT(MONTH FROM AGE(CURRENT_DATE, activation_date))
+    target_table: metrics.customer_metrics
+    target_column: tenure_months
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.activation_date
+  downstream_consumers:
+    - dashboard:customer_overview
+    - ml_feature:tenure_months
+    - report:monthly_retention
+
+dq_rules:
+  - rule_id: tenure_months_completeness
+    dimension: completeness
+    check_expression: "tenure_months IS NOT NULL"
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: tenure_months_validity_range
+    dimension: validity
+    check_expression: "tenure_months >= 0 AND tenure_months <= 600"
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: tenure_months_accuracy_vs_activation
+    dimension: accuracy
+    check_expression: >
+      ABS(tenure_months - (EXTRACT(YEAR FROM AGE(CURRENT_DATE, activation_date)) * 12 +
+      EXTRACT(MONTH FROM AGE(CURRENT_DATE, activation_date)))) <= 1
+    warn_threshold: 0.99
+    fail_threshold: 0.95

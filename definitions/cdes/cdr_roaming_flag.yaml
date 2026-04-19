@@ -1,0 +1,12 @@
+cde_id: cdr.roaming_flag
+name: Roaming Flag
+description: >
+  Boolean indicating whether a call or data session occurred while the customer
+  was roaming outside their home network.
+source_system: cdr
+source_field: roaming_flag
+data_type: boolean
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

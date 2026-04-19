@@ -1,0 +1,12 @@
+cde_id: cdr.drop_flag
+name: Dropped Call Flag
+description: >
+  Boolean indicating whether a voice call was dropped before either party
+  ended the call. Used to compute dropped call rate.
+source_system: cdr
+source_field: drop_flag
+data_type: boolean
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

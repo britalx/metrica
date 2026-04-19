@@ -1,0 +1,67 @@
+metric_id: usage_trend_3m
+name: Usage Trend (3 Months)
+description: >
+  Linear slope of monthly combined usage (voice + data) over the last 3 months.
+  Negative values indicate declining engagement — a strong churn predictor.
+domain: usage_behavior
+owner: Data Engineering
+refresh_cadence: daily
+data_type: float
+unit: slope
+version: 1
+status: active
+tags:
+  - churn_feature
+  - usage_behavior
+  - ml_ready
+
+source_mappings:
+  - source_system: cdr
+    source_table: cdr_call_records
+    source_fields:
+      - data_bytes_transferred
+      - call_duration
+    transformation: >
+      SELECT customer_id,
+             (SUM(CASE WHEN call_date >= DATE '2026-02-13'
+                       THEN duration_seconds ELSE 0 END)::FLOAT
+              - SUM(CASE WHEN call_date < DATE '2026-02-13'
+                         AND call_date >= DATE '2026-01-14'
+                         THEN duration_seconds ELSE 0 END)::FLOAT)
+             / NULLIF(SUM(CASE WHEN call_date < DATE '2026-02-13'
+                               AND call_date >= DATE '2026-01-14'
+                               THEN duration_seconds ELSE 0 END)::FLOAT, 0)
+             AS usage_trend_3m
+      FROM raw.cdr_call_records
+      WHERE call_date >= DATE '2025-12-15'
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: usage_trend_3m
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - cdr.data_bytes_transferred
+    - cdr.call_duration
+  downstream_consumers:
+    - ml_feature:usage_trend_3m
+    - metric:usage_decay_score
+
+dq_rules:
+  - rule_id: usage_trend_3m_completeness
+    name: All active customers have a usage trend value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE usage_trend_3m IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: usage_trend_3m_validity
+    name: Usage trend is within plausible range
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE usage_trend_3m < -100 OR usage_trend_3m > 100)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

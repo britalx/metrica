@@ -1,0 +1,66 @@
+metric_id: last_bill_change_pct
+name: Last Bill Change Percentage
+description: >
+  Percentage change in the most recent bill compared to the prior month.
+  Sudden bill increases are a strong trigger for voluntary churn.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: monthly
+data_type: float
+unit: percent
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - ml_ready
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields:
+      - invoice_amount
+    transformation: >
+      SELECT customer_id,
+             ((curr.total_amount - prev.total_amount) / NULLIF(prev.total_amount, 0)) * 100.0
+             AS last_bill_change_pct
+      FROM (
+          SELECT customer_id, total_amount,
+                 ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY invoice_date DESC) AS rn
+          FROM raw.billing_invoices
+      ) curr
+      JOIN (
+          SELECT customer_id, total_amount,
+                 ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY invoice_date DESC) AS rn
+          FROM raw.billing_invoices
+      ) prev ON curr.customer_id = prev.customer_id AND prev.rn = 2
+      WHERE curr.rn = 1
+    target_table: metrics.customer_metrics
+    target_column: last_bill_change_pct
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - billing.invoice_amount
+  downstream_consumers:
+    - ml_feature:last_bill_change_pct
+    - dashboard:billing_alerts
+
+dq_rules:
+  - rule_id: last_bill_change_pct_completeness
+    name: All customers with 2+ invoices have a bill change value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE last_bill_change_pct IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: last_bill_change_pct_validity
+    name: Bill change percentage is within plausible range
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE last_bill_change_pct < -100 OR last_bill_change_pct > 500)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

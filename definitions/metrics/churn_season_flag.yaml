@@ -1,0 +1,54 @@
+metric_id: churn_season_flag
+name: Churn Season Flag
+description: >
+  Whether the current month is historically a high-churn period (January, September).
+  Seasonal patterns affect churn propensity and should be controlled for in models.
+domain: derived_engineered
+owner: Data Science
+refresh_cadence: monthly
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - derived
+  - seasonal
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- Derived from calendar — no raw source needed
+      SELECT customer_id,
+             EXTRACT(MONTH FROM CURRENT_DATE) IN (1, 9) AS churn_season_flag
+      FROM metrics.customer_metrics
+    target_table: metrics.customer_metrics
+    target_column: churn_season_flag
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:churn_season_flag
+    - dashboard:seasonal_analysis
+
+dq_rules:
+  - rule_id: churn_season_flag_completeness
+    name: All customers have a churn season flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE churn_season_flag IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: churn_season_flag_validity
+    name: Churn season flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE churn_season_flag NOT IN (TRUE, FALSE) AND churn_season_flag IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

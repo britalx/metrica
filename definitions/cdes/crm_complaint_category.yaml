@@ -1,0 +1,12 @@
+cde_id: crm.complaint_category
+name: Complaint Category
+description: >
+  Categorization of a customer complaint such as coverage, billing, service,
+  or device. Used to flag coverage-related complaints.
+source_system: crm
+source_field: complaint_category
+data_type: string
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: daily
+nullable: true

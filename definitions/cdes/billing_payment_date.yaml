@@ -1,0 +1,12 @@
+cde_id: billing.payment_date
+name: Payment Date
+description: >
+  Date when payment was received for an invoice. NULL if unpaid. Used to
+  compute payment delay metrics.
+source_system: billing
+source_field: payment_date
+data_type: date
+business_owner: Revenue Management
+sensitivity: confidential
+update_frequency: daily
+nullable: true

@@ -1,0 +1,12 @@
+cde_id: crm.contract_end_date
+name: Contract End Date
+description: >
+  Date when the customer's current contract period expires. Used to compute
+  months remaining and identify at-risk contract-end windows.
+source_system: crm
+source_field: contract_end_date
+data_type: date
+business_owner: Customer Operations
+sensitivity: internal
+update_frequency: daily
+nullable: true

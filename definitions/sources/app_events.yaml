@@ -1,0 +1,7 @@
+source_id: app_events
+name: Mobile App Events
+description: >
+  Event stream from the mobile self-service app. Tracks logins, page views,
+  speed tests, and feature usage within the app.
+system_type: stream
+connection_hint: kafka.app_events_topic

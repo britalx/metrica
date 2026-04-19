@@ -1,0 +1,12 @@
+cde_id: crm.ticket_created_at
+name: Ticket Created At
+description: >
+  Timestamp when a support ticket was created. Used with resolution timestamp
+  to compute average ticket resolution time.
+source_system: crm
+source_field: ticket_created_at
+data_type: timestamp
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: daily
+nullable: false

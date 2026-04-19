@@ -1,0 +1,12 @@
+cde_id: crm.plan_data_allowance
+name: Plan Data Allowance
+description: >
+  Monthly data allowance in GB for the customer's current plan. Used to
+  compute usage-to-plan utilization ratios.
+source_system: crm
+source_field: plan_data_allowance
+data_type: float
+business_owner: Product Management
+sensitivity: internal
+update_frequency: daily
+nullable: false

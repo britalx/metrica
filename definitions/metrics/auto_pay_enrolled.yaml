@@ -1,0 +1,54 @@
+metric_id: auto_pay_enrolled
+name: Auto-Pay Enrolled
+description: >
+  Whether the customer is enrolled in automatic payment.
+  Auto-pay customers tend to have lower voluntary churn due to reduced friction.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: daily
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - stickiness
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: autopay_flag not in mock data
+      -- Real source: SELECT customer_id, autopay_flag AS auto_pay_enrolled FROM raw.crm_customers
+      SELECT customer_id, NULL::BOOLEAN AS auto_pay_enrolled
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: auto_pay_enrolled
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:auto_pay_enrolled
+    - dashboard:billing_overview
+
+dq_rules:
+  - rule_id: auto_pay_enrolled_completeness
+    name: All customers have an auto-pay enrollment flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE auto_pay_enrolled IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: auto_pay_enrolled_validity
+    name: Auto-pay flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE auto_pay_enrolled NOT IN (TRUE, FALSE) AND auto_pay_enrolled IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

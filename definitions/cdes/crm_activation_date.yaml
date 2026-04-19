@@ -1,0 +1,13 @@
+# CDE: activation_date — when the customer account was activated
+cde_id: crm.activation_date
+name: Customer Activation Date
+description: >
+  The date when the customer's account was first activated. Used to compute
+  tenure and cohort-based metrics.
+source_system: crm
+source_field: activation_date
+data_type: date
+business_owner: Customer Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

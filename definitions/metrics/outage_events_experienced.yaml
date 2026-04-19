@@ -1,0 +1,55 @@
+metric_id: outage_events_experienced
+name: Outage Events Experienced (90 Days)
+description: >
+  Count of network outage events in the customer's coverage zone over the
+  last 90 days. Repeated outages erode trust and drive churn.
+domain: network_quality
+owner: Network Operations
+refresh_cadence: daily
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - network
+
+source_mappings:
+  - source_system: network
+    source_table: network_measurements
+    source_fields:
+      - outage_flag
+    transformation: >
+      SELECT customer_id,
+             SUM(CASE WHEN outage_flag THEN 1 ELSE 0 END) AS outage_events_experienced
+      FROM raw.network_measurements
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: outage_events_experienced
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - network.outage_events
+  downstream_consumers:
+    - ml_feature:outage_events_experienced
+    - dashboard:network_quality
+
+dq_rules:
+  - rule_id: outage_events_experienced_completeness
+    name: All customers have an outage events count
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE outage_events_experienced IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: outage_events_experienced_validity
+    name: Outage events count is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE outage_events_experienced < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

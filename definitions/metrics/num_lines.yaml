@@ -1,0 +1,56 @@
+metric_id: num_lines
+name: Number of Active Lines
+description: >
+  Number of active phone lines on the customer's account.
+  Multi-line accounts have higher switching costs and lower churn rates.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+  - stickiness
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - line_count
+    transformation: >
+      SELECT customer_id,
+             line_count AS num_lines
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: num_lines
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.line_count
+  downstream_consumers:
+    - ml_feature:num_lines
+    - metric:stickiness_score
+    - dashboard:account_overview
+
+dq_rules:
+  - rule_id: num_lines_completeness
+    name: All customers have a line count
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE num_lines IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: num_lines_validity
+    name: Line count is positive and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE num_lines < 1 OR num_lines > 20)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

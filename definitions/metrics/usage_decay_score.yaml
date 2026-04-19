@@ -1,0 +1,59 @@
+metric_id: usage_decay_score
+name: Usage Decay Score
+description: >
+  Weighted slope of usage trend over 3-month and 6-month windows — higher
+  values indicate more rapid usage decline. Combines voice and data trends
+  into a single decay signal.
+domain: derived_engineered
+owner: Data Science
+refresh_cadence: daily
+data_type: float
+unit: score
+version: 1
+status: active
+tags:
+  - churn_feature
+  - derived
+  - ml_ready
+
+source_mappings:
+  - source_system: cdr
+    source_table: cdr_call_records
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: Requires window functions over monthly aggregates
+      -- Real source would compute weighted linear regression slope
+      -- across 3m and 6m usage windows from CDR data
+      SELECT customer_id, NULL::FLOAT AS usage_decay_score
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: usage_decay_score
+
+lineage:
+  upstream_metrics:
+    - usage_trend_3m
+  upstream_cdes:
+    - cdr.data_bytes_transferred
+    - cdr.call_duration
+  downstream_consumers:
+    - ml_feature:usage_decay_score
+    - dashboard:churn_risk
+
+dq_rules:
+  - rule_id: usage_decay_score_completeness
+    name: All customers have a usage decay score
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE usage_decay_score IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: usage_decay_score_validity
+    name: Usage decay score is within plausible range
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE usage_decay_score < -10 OR usage_decay_score > 10)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

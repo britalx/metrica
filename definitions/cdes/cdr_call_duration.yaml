@@ -1,0 +1,12 @@
+cde_id: cdr.call_duration
+name: Call Duration
+description: >
+  Duration of a voice call in seconds. Used to compute average monthly minutes
+  and usage behavior metrics.
+source_system: cdr
+source_field: call_duration
+data_type: float
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

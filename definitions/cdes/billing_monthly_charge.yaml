@@ -1,0 +1,13 @@
+# CDE: monthly_charge_amount — current monthly billing amount
+cde_id: billing.monthly_charge_amount
+name: Monthly Charge Amount
+description: >
+  The total recurring monthly charge on the customer's latest invoice,
+  including plan fees, add-ons, and applicable discounts.
+source_system: billing
+source_field: monthly_charge_amount
+data_type: float
+business_owner: Revenue Management
+sensitivity: confidential
+update_frequency: monthly
+nullable: false

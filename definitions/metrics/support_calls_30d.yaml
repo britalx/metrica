@@ -1,0 +1,78 @@
+# Metric: support_calls_30d
+# Domain: Customer Service
+# Source: Contact Center
+
+metric_id: support_calls_30d
+name: Support Calls (Last 30 Days)
+description: >
+  Count of phone support calls made by the customer in the trailing 30-day
+  window. High-frequency support contact is a strong churn signal — customers
+  calling 3+ times in 30 days have 2-3x higher churn propensity.
+domain: customer_service
+owner: Customer Support
+refresh_cadence: daily
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+  - service_friction
+
+source_mappings:
+  - source_system: contact_center
+    source_table: contact_center_interactions
+    source_fields:
+      - interaction_date
+      - interaction_type
+      - customer_id
+    transformation: >
+      SELECT customer_id,
+             COUNT(*) AS support_calls_30d
+      FROM contact_center_interactions
+      WHERE interaction_type = 'call'
+        AND interaction_date >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: support_calls_30d
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - contact_center.interaction_date
+    - contact_center.interaction_type
+  downstream_consumers:
+    - dashboard:service_quality
+    - ml_feature:support_calls_30d
+    - metric:support_calls_trend
+    - metric:service_distress_index
+
+dq_rules:
+  - rule_id: support_calls_30d_completeness
+    dimension: completeness
+    check_expression: "support_calls_30d IS NOT NULL"
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: support_calls_30d_validity_range
+    dimension: validity
+    check_expression: "support_calls_30d >= 0 AND support_calls_30d <= 500"
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: support_calls_30d_timeliness
+    dimension: timeliness
+    check_expression: >
+      last_updated >= CURRENT_DATE - INTERVAL '2 days'
+    warn_threshold: 0.95
+    fail_threshold: 0.85
+
+  - rule_id: support_calls_30d_consistency_src
+    dimension: consistency
+    check_expression: >
+      ABS(support_calls_30d - (SELECT COUNT(*) FROM contact_center_interactions
+      WHERE customer_id = t.customer_id AND interaction_type = 'call'
+      AND interaction_date >= CURRENT_DATE - INTERVAL '30 days')) = 0
+    warn_threshold: 0.99
+    fail_threshold: 0.95

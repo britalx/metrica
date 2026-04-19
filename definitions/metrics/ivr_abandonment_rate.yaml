@@ -1,0 +1,57 @@
+metric_id: ivr_abandonment_rate
+name: IVR Abandonment Rate (30 Days)
+description: >
+  Percentage of IVR calls abandoned before reaching an agent in the last 30 days.
+  High abandonment rates indicate frustration with the support experience.
+domain: customer_service
+owner: Customer Support
+refresh_cadence: daily
+data_type: float
+unit: ratio
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+
+source_mappings:
+  - source_system: contact_center
+    source_table: contact_center_interactions
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: ivr_abandon_flag not in mock data
+      -- Real source: SELECT customer_id,
+      --              COUNT(*) FILTER (WHERE ivr_abandoned = TRUE)::FLOAT / NULLIF(COUNT(*), 0)
+      --              AS ivr_abandonment_rate
+      --              FROM raw.contact_center_ivr WHERE call_date >= CURRENT_DATE - INTERVAL '30 days'
+      --              GROUP BY customer_id
+      SELECT customer_id, NULL::FLOAT AS ivr_abandonment_rate
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: ivr_abandonment_rate
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:ivr_abandonment_rate
+    - dashboard:service_quality
+
+dq_rules:
+  - rule_id: ivr_abandonment_rate_completeness
+    name: All customers with IVR calls have an abandonment rate
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE ivr_abandonment_rate IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.70
+    fail_threshold: 0.50
+
+  - rule_id: ivr_abandonment_rate_validity
+    name: IVR abandonment rate is between 0 and 1
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE ivr_abandonment_rate < 0 OR ivr_abandonment_rate > 1)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

@@ -1,0 +1,12 @@
+cde_id: crm.ticket_resolved_at
+name: Ticket Resolved At
+description: >
+  Timestamp when a support ticket was resolved. NULL for unresolved tickets.
+  Used to compute average resolution time metrics.
+source_system: crm
+source_field: ticket_resolved_at
+data_type: timestamp
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: daily
+nullable: true

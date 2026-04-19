@@ -1,0 +1,61 @@
+metric_id: stickiness_score
+name: Stickiness Score
+description: >
+  Composite switching-cost score: num_lines * (1 + device_financing_active) *
+  months_to_contract_end. Higher values indicate more barriers to leaving.
+domain: derived_engineered
+owner: Data Science
+refresh_cadence: daily
+data_type: float
+unit: score
+version: 1
+status: active
+tags:
+  - churn_feature
+  - derived
+  - retention
+  - ml_ready
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- Derived from metrics layer (not raw sources)
+      SELECT customer_id,
+             COALESCE(num_lines, 1)
+             * (1 + CASE WHEN device_financing_active THEN 1 ELSE 0 END)
+             * COALESCE(months_to_contract_end, 0)::FLOAT
+             AS stickiness_score
+      FROM metrics.customer_metrics
+    target_table: metrics.customer_metrics
+    target_column: stickiness_score
+
+lineage:
+  upstream_metrics:
+    - num_lines
+    - device_financing_active
+    - months_to_contract_end
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:stickiness_score
+    - dashboard:churn_risk
+
+dq_rules:
+  - rule_id: stickiness_score_completeness
+    name: All customers have a stickiness score
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE stickiness_score IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: stickiness_score_validity
+    name: Stickiness score is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE stickiness_score < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

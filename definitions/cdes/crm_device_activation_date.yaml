@@ -1,0 +1,12 @@
+cde_id: crm.device_activation_date
+name: Device Activation Date
+description: >
+  Date when the customer's current primary device was activated on the network.
+  Used to compute device age in months.
+source_system: crm
+source_field: device_activation_date
+data_type: date
+business_owner: Customer Operations
+sensitivity: internal
+update_frequency: daily
+nullable: true

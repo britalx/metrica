@@ -1,0 +1,12 @@
+cde_id: crm.plan_code
+name: Plan Code
+description: >
+  Code identifying the customer's current service plan. Used to derive
+  plan tier encoding and data allowance.
+source_system: crm
+source_field: plan_code
+data_type: string
+business_owner: Product Management
+sensitivity: internal
+update_frequency: daily
+nullable: false

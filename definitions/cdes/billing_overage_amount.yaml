@@ -1,0 +1,12 @@
+cde_id: billing.overage_amount
+name: Overage Amount
+description: >
+  Overage fee charged on an invoice for exceeding plan limits. Frequent
+  overages may signal plan dissatisfaction.
+source_system: billing
+source_field: overage_amount
+data_type: float
+business_owner: Revenue Management
+sensitivity: confidential
+update_frequency: monthly
+nullable: true

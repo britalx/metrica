@@ -1,0 +1,12 @@
+cde_id: crm.line_count
+name: Line Count
+description: >
+  Number of active phone lines on the customer's account. Multi-line accounts
+  tend to have higher retention due to coordination costs.
+source_system: crm
+source_field: line_count
+data_type: integer
+business_owner: Customer Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

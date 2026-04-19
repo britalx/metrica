@@ -1,0 +1,57 @@
+metric_id: device_financing_active
+name: Device Financing Active
+description: >
+  Whether the customer currently has an active device installment plan.
+  Device financing creates switching cost — customers with outstanding
+  balances are less likely to churn.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+  - stickiness
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - device_financing_flag
+    transformation: >
+      SELECT customer_id,
+             device_financing_flag AS device_financing_active
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: device_financing_active
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.device_financing_flag
+  downstream_consumers:
+    - ml_feature:device_financing_active
+    - metric:stickiness_score
+    - dashboard:account_overview
+
+dq_rules:
+  - rule_id: device_financing_active_completeness
+    name: All customers have a financing flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE device_financing_active IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: device_financing_active_validity
+    name: Financing flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE device_financing_active NOT IN (TRUE, FALSE) AND device_financing_active IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

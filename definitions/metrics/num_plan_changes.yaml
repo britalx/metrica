@@ -1,0 +1,55 @@
+metric_id: num_plan_changes
+name: Plan Changes (Last 12 Months)
+description: >
+  Count of plan upgrades or downgrades in the last 12 months.
+  Frequent plan changes indicate dissatisfaction with current plan fit.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: monthly
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: plan_change_log not in mock data
+      -- Real source: SELECT customer_id, COUNT(*) AS num_plan_changes
+      --              FROM raw.crm_plan_changes WHERE change_date >= CURRENT_DATE - INTERVAL '12 months'
+      --              GROUP BY customer_id
+      SELECT customer_id, NULL::INTEGER AS num_plan_changes
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: num_plan_changes
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:num_plan_changes
+    - dashboard:plan_analysis
+
+dq_rules:
+  - rule_id: num_plan_changes_completeness
+    name: All customers have a plan change count
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE num_plan_changes IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: num_plan_changes_validity
+    name: Plan change count is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE num_plan_changes < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

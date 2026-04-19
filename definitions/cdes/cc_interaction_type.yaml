@@ -1,0 +1,13 @@
+# CDE: interaction_type — type of support interaction
+cde_id: contact_center.interaction_type
+name: Interaction Type
+description: >
+  Classification of the support interaction: 'call', 'chat', 'email', 'ivr'.
+  Used to filter support_calls_30d to phone calls only.
+source_system: contact_center
+source_field: interaction_type
+data_type: string
+business_owner: Customer Support
+sensitivity: internal
+update_frequency: hourly
+nullable: false

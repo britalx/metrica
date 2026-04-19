@@ -1,0 +1,57 @@
+metric_id: avg_overage_charges
+name: Average Overage Charges
+description: >
+  Average monthly overage fees over the last 6 months.
+  Frequent overages may drive dissatisfaction and churn if customers feel
+  they are paying too much relative to plan value.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: monthly
+data_type: float
+unit: USD
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields:
+      - overage_amount
+    transformation: >
+      SELECT customer_id,
+             AVG(overage_amount) AS avg_overage_charges
+      FROM raw.billing_invoices
+      WHERE invoice_date >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: avg_overage_charges
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - billing.overage_amount
+  downstream_consumers:
+    - ml_feature:avg_overage_charges
+    - dashboard:billing_analysis
+
+dq_rules:
+  - rule_id: avg_overage_charges_completeness
+    name: All customers have an overage charges value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE avg_overage_charges IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: avg_overage_charges_validity
+    name: Overage charges are non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE avg_overage_charges < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

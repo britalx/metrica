@@ -1,0 +1,49 @@
+metric_id: churn_label_30d
+name: "30-Day Churn Label"
+description: >
+  Binary churn indicator: 1 if customer churned within 30 days of observation date,
+  0 otherwise. Derived from account_status transitions. Used as the target variable
+  for churn prediction models.
+  NOTE: In mock data, approximated as account_status == 'Terminated'.
+domain: derived_engineered
+owner: "data-science"
+refresh_cadence: daily
+data_type: integer
+unit: binary_flag
+source_mappings:
+  - source_system: crm
+    source_table: raw.crm_customers
+    source_fields:
+      - account_status
+    transformation: |
+      CASE WHEN account_status = 'Terminated' THEN 1 ELSE 0 END
+lineage:
+  upstream_cdes:
+    - crm.account_status
+  downstream_consumers:
+    - ml.churn_model_baseline
+    - ml.churn_model_xgboost
+dq_rules:
+  - rule_id: churn_label_completeness
+    name: "All customers have a churn label"
+    dimension: completeness
+    check_expression: |
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE churn_label_30d IS NULL)::FLOAT / COUNT(*))
+      FROM metrics.customer_metrics
+    warn_threshold: 1.0
+    fail_threshold: 0.99
+  - rule_id: churn_label_validity
+    name: "Churn label is binary (0 or 1 only)"
+    dimension: validity
+    check_expression: |
+      SELECT 1.0 - (COUNT(*) FILTER (
+        WHERE churn_label_30d NOT IN (0, 1))::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 1.0
+    fail_threshold: 1.0
+tags:
+  - target_variable
+  - churn_prediction
+  - ml_ready
+version: "1.0"
+status: active

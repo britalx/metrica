@@ -1,0 +1,12 @@
+cde_id: cdr.sms_event
+name: SMS Event
+description: >
+  Timestamp of an SMS send or receive event. Used to compute monthly SMS
+  volume metrics.
+source_system: cdr
+source_field: sms_event
+data_type: timestamp
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

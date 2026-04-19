@@ -1,0 +1,12 @@
+cde_id: billing.invoice_amount
+name: Invoice Amount
+description: >
+  Total amount on a billing invoice, including plan fees, add-ons, discounts,
+  and overage charges.
+source_system: billing
+source_field: invoice_amount
+data_type: float
+business_owner: Revenue Management
+sensitivity: confidential
+update_frequency: monthly
+nullable: false

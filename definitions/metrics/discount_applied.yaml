@@ -1,0 +1,55 @@
+metric_id: discount_applied
+name: Discount Currently Applied
+description: >
+  Whether the customer currently has a promotional discount on their account.
+  Customers on expiring promotions are at elevated churn risk.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: daily
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - promotion
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: discount_code not in mock data
+      -- Real source: SELECT customer_id, discount_code IS NOT NULL AS discount_applied
+      --              FROM raw.billing_promotions WHERE end_date >= CURRENT_DATE
+      SELECT customer_id, NULL::BOOLEAN AS discount_applied
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: discount_applied
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:discount_applied
+    - metric:discount_expiry_days
+
+dq_rules:
+  - rule_id: discount_applied_completeness
+    name: All customers have a discount flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE discount_applied IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: discount_applied_validity
+    name: Discount flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE discount_applied NOT IN (TRUE, FALSE) AND discount_applied IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

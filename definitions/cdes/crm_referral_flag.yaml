@@ -1,0 +1,12 @@
+cde_id: crm.referral_flag
+name: Referral Flag
+description: >
+  Boolean indicating whether the customer has made at least one referral.
+  Referral behaviour is a strong retention signal.
+source_system: crm
+source_field: referral_flag
+data_type: boolean
+business_owner: Marketing
+sensitivity: internal
+update_frequency: daily
+nullable: false

@@ -1,0 +1,12 @@
+cde_id: billing.due_date
+name: Invoice Due Date
+description: >
+  Payment due date for an invoice. Compared with payment_date to determine
+  whether payment was late.
+source_system: billing
+source_field: due_date
+data_type: date
+business_owner: Revenue Management
+sensitivity: confidential
+update_frequency: monthly
+nullable: false

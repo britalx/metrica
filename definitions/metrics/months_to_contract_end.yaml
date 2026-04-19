@@ -1,0 +1,61 @@
+metric_id: months_to_contract_end
+name: Months to Contract End
+description: >
+  Number of months remaining until the customer's contract expires.
+  Customers nearing contract end are at peak voluntary churn risk — the
+  "contract cliff" is the #1 churn timing predictor.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: integer
+unit: months
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+  - retention
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - contract_end_date
+    transformation: >
+      SELECT customer_id,
+             GREATEST(0,
+                EXTRACT(YEAR FROM AGE(contract_end_date, CURRENT_DATE)) * 12 +
+                EXTRACT(MONTH FROM AGE(contract_end_date, CURRENT_DATE))
+             )::INTEGER AS months_to_contract_end
+      FROM raw.crm_customers
+      WHERE contract_end_date IS NOT NULL
+    target_table: metrics.customer_metrics
+    target_column: months_to_contract_end
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.contract_end_date
+  downstream_consumers:
+    - ml_feature:months_to_contract_end
+    - metric:stickiness_score
+    - dashboard:contract_overview
+
+dq_rules:
+  - rule_id: months_to_contract_end_completeness
+    name: All contract customers have a months-to-end value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE months_to_contract_end IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: months_to_contract_end_validity
+    name: Months to contract end is non-negative and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE months_to_contract_end < 0 OR months_to_contract_end > 60)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

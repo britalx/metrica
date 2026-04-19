@@ -1,0 +1,12 @@
+cde_id: network.outage_events
+name: Network Outage Events
+description: >
+  Count of network outage events in a customer's coverage zone. Used to
+  assess service reliability impact on customer experience.
+source_system: network
+source_field: outage_events
+data_type: integer
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: true

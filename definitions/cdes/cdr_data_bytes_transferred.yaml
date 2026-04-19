@@ -1,0 +1,12 @@
+cde_id: cdr.data_bytes_transferred
+name: Data Bytes Transferred
+description: >
+  Number of bytes transferred in a data session. Aggregated to compute monthly
+  data usage in GB and usage trend metrics.
+source_system: cdr
+source_field: data_bytes_transferred
+data_type: float
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: false

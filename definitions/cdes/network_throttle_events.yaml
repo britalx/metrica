@@ -1,0 +1,12 @@
+cde_id: network.throttle_events
+name: Data Throttling Events
+description: >
+  Count of times a customer's data connection was throttled due to policy
+  enforcement or fair-use limits.
+source_system: network
+source_field: throttle_events
+data_type: integer
+business_owner: Network Operations
+sensitivity: internal
+update_frequency: daily
+nullable: true

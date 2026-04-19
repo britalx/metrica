@@ -1,0 +1,13 @@
+cde_id: network.rsrp
+name: Reference Signal Received Power
+description: >
+  Signal strength measurement in dBm at the cell tower. Lower (more negative)
+  values indicate weaker signal. Used to assess network quality at customer
+  locations.
+source_system: network
+source_field: rsrp
+data_type: float
+business_owner: Network Engineering
+sensitivity: internal
+update_frequency: hourly
+nullable: true

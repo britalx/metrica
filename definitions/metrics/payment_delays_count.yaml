@@ -1,0 +1,59 @@
+metric_id: payment_delays_count
+name: Payment Delays Count (12 Months)
+description: >
+  Count of late payments in the last 12 months. Frequent payment delays
+  are a financial distress signal and correlate with involuntary churn.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: monthly
+data_type: integer
+unit: count
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - credit_risk
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields:
+      - payment_date
+      - due_date
+    transformation: >
+      SELECT customer_id,
+             COUNT(*) FILTER (WHERE payment_date > due_date) AS payment_delays_count
+      FROM raw.billing_invoices
+      WHERE invoice_date >= CURRENT_DATE - INTERVAL '12 months'
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: payment_delays_count
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - billing.payment_date
+    - billing.due_date
+  downstream_consumers:
+    - ml_feature:payment_delays_count
+    - dashboard:credit_risk
+
+dq_rules:
+  - rule_id: payment_delays_count_completeness
+    name: All customers have a payment delays count
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE payment_delays_count IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: payment_delays_count_validity
+    name: Payment delays count is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE payment_delays_count < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

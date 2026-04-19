@@ -1,0 +1,58 @@
+metric_id: competitor_inquiry_flag
+name: Competitor Inquiry Flag
+description: >
+  Whether the customer has contacted the retention team or shown competitor
+  interest (e.g. mentioning switching, requesting port-out info). A strong
+  immediate-churn signal.
+domain: behavioral_engagement
+owner: Customer Retention
+refresh_cadence: daily
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - engagement
+  - retention
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- PLACEHOLDER: retention_contact_flag not in mock data
+      -- Real source: SELECT customer_id,
+      --              BOOL_OR(contact_reason LIKE '%competitor%' OR contact_reason LIKE '%port%')
+      --              AS competitor_inquiry_flag
+      --              FROM raw.crm_retention_contacts GROUP BY customer_id
+      SELECT customer_id, NULL::BOOLEAN AS competitor_inquiry_flag
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: competitor_inquiry_flag
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:competitor_inquiry_flag
+    - dashboard:retention_risk
+
+dq_rules:
+  - rule_id: competitor_inquiry_flag_completeness
+    name: All customers have a competitor inquiry flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE competitor_inquiry_flag IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: competitor_inquiry_flag_validity
+    name: Competitor inquiry flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE competitor_inquiry_flag NOT IN (TRUE, FALSE) AND competitor_inquiry_flag IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

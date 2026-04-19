@@ -1,0 +1,58 @@
+metric_id: contract_type_encoded
+name: Contract Type Encoded
+description: >
+  Contract type as integer: 0=Month-to-Month, 1=One Year, 2=Two Year.
+  Month-to-month customers have highest churn risk with no contractual obligation.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: integer
+unit: code
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+  - ml_ready
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      SELECT customer_id,
+             CASE contract_type
+               WHEN 'month-to-month' THEN 0
+               WHEN 'one_year' THEN 1
+               WHEN 'two_year' THEN 2
+               ELSE 0
+             END AS contract_type_encoded
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: contract_type_encoded
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:contract_type_encoded
+    - metric:stickiness_score
+
+dq_rules:
+  - rule_id: contract_type_encoded_completeness
+    name: All customers have a contract type
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE contract_type_encoded IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: contract_type_encoded_validity
+    name: Contract type is 0, 1, or 2
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE contract_type_encoded NOT IN (0, 1, 2))::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

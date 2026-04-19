@@ -1,0 +1,63 @@
+metric_id: service_distress_index
+name: Service Distress Index
+description: >
+  Composite distress signal: normalised(support_calls_30d) +
+  normalised(unresolved_tickets) + normalised(1 - nps_score/100).
+  Higher values indicate greater service-related churn risk.
+domain: derived_engineered
+owner: Data Science
+refresh_cadence: daily
+data_type: float
+unit: score
+version: 1
+status: active
+tags:
+  - churn_feature
+  - derived
+  - composite
+  - ml_ready
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields: []
+    transformation: >
+      -- Derived from metrics layer (not raw sources)
+      -- Requires min/max normalization of component metrics
+      SELECT customer_id,
+             COALESCE(support_calls_30d, 0)::FLOAT / NULLIF((SELECT MAX(support_calls_30d) FROM metrics.customer_metrics), 0)
+             + COALESCE(unresolved_tickets_count, 0)::FLOAT / NULLIF((SELECT MAX(unresolved_tickets_count) FROM metrics.customer_metrics), 0)
+             + (1.0 - COALESCE(nps_score, 5)::FLOAT / 10.0)
+             AS service_distress_index
+      FROM metrics.customer_metrics
+    target_table: metrics.customer_metrics
+    target_column: service_distress_index
+
+lineage:
+  upstream_metrics:
+    - support_calls_30d
+    - unresolved_tickets_count
+    - nps_score
+  upstream_cdes: []
+  downstream_consumers:
+    - ml_feature:service_distress_index
+    - dashboard:churn_risk
+
+dq_rules:
+  - rule_id: service_distress_index_completeness
+    name: All customers have a distress index
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE service_distress_index IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.80
+    fail_threshold: 0.60
+
+  - rule_id: service_distress_index_validity
+    name: Distress index is non-negative
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE service_distress_index < 0)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

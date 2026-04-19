@@ -1,0 +1,57 @@
+metric_id: night_weekend_usage_ratio
+name: Night & Weekend Usage Ratio
+description: >
+  Ratio of night and weekend call/data usage to total usage.
+  Unusual patterns in off-peak usage can signal changing customer behavior.
+domain: usage_behavior
+owner: Data Engineering
+refresh_cadence: daily
+data_type: float
+unit: ratio
+version: 1
+status: active
+tags:
+  - churn_feature
+  - usage_behavior
+
+source_mappings:
+  - source_system: cdr
+    source_table: cdr_call_records
+    source_fields:
+      - call_start_time
+    transformation: >
+      SELECT customer_id,
+             SUM(CASE WHEN is_night OR is_weekend THEN 1 ELSE 0 END)::FLOAT
+             / NULLIF(COUNT(*), 0) AS night_weekend_usage_ratio
+      FROM raw.cdr_call_records
+      WHERE call_date >= DATE '2026-02-13'
+      GROUP BY customer_id
+    target_table: metrics.customer_metrics
+    target_column: night_weekend_usage_ratio
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - cdr.call_start_time
+  downstream_consumers:
+    - ml_feature:night_weekend_usage_ratio
+    - dashboard:usage_patterns
+
+dq_rules:
+  - rule_id: night_weekend_usage_ratio_completeness
+    name: All active customers have a ratio value
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE night_weekend_usage_ratio IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: night_weekend_usage_ratio_validity
+    name: Ratio is between 0 and 1
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE night_weekend_usage_ratio < 0 OR night_weekend_usage_ratio > 1)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

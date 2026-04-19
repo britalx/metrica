@@ -1,0 +1,60 @@
+metric_id: csat_last_interaction
+name: CSAT Last Interaction
+description: >
+  Customer satisfaction score (1-5) from the most recent support interaction.
+  Low CSAT scores combined with frequent contacts are strong churn predictors.
+domain: customer_service
+owner: Customer Experience
+refresh_cadence: daily
+data_type: float
+unit: score
+version: 1
+status: active
+tags:
+  - churn_feature
+  - support
+
+source_mappings:
+  - source_system: contact_center
+    source_table: contact_center_interactions
+    source_fields:
+      - csat_score
+    transformation: >
+      SELECT customer_id,
+             csat_score AS csat_last_interaction
+      FROM raw.contact_center_interactions
+      WHERE interaction_date = (
+          SELECT MAX(interaction_date)
+          FROM raw.contact_center_interactions ci
+          WHERE ci.customer_id = contact_center_interactions.customer_id
+            AND ci.csat_score IS NOT NULL
+      )
+    target_table: metrics.customer_metrics
+    target_column: csat_last_interaction
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - contact_center.csat_score
+  downstream_consumers:
+    - ml_feature:csat_last_interaction
+    - dashboard:customer_experience
+
+dq_rules:
+  - rule_id: csat_last_interaction_completeness
+    name: Customers with interactions have a CSAT score
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE csat_last_interaction IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.70
+    fail_threshold: 0.50
+
+  - rule_id: csat_last_interaction_validity
+    name: CSAT score is between 1 and 5
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE csat_last_interaction < 1 OR csat_last_interaction > 5)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

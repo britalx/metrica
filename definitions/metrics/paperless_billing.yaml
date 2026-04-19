@@ -1,0 +1,55 @@
+metric_id: paperless_billing
+name: Paperless Billing Enrolled
+description: >
+  Whether the customer is enrolled in paperless billing. Digital engagement
+  signals like paperless enrollment correlate with lower churn.
+domain: behavioral_engagement
+owner: Customer Operations
+refresh_cadence: daily
+data_type: boolean
+unit: flag
+version: 1
+status: active
+tags:
+  - churn_feature
+  - engagement
+  - digital
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - paperless_flag
+    transformation: >
+      SELECT customer_id,
+             paperless_flag AS paperless_billing
+      FROM raw.crm_customers
+    target_table: metrics.customer_metrics
+    target_column: paperless_billing
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.paperless_flag
+  downstream_consumers:
+    - ml_feature:paperless_billing
+    - dashboard:engagement_overview
+
+dq_rules:
+  - rule_id: paperless_billing_completeness
+    name: All customers have a paperless billing flag
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE paperless_billing IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.95
+    fail_threshold: 0.80
+
+  - rule_id: paperless_billing_validity
+    name: Paperless billing flag is boolean
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE paperless_billing NOT IN (TRUE, FALSE) AND paperless_billing IS NOT NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

@@ -1,0 +1,59 @@
+metric_id: device_age_months
+name: Device Age (Months)
+description: >
+  Age in months of the customer's current primary device since activation.
+  Older devices correlate with higher churn — customers may be waiting for
+  an upgrade opportunity to switch carriers.
+domain: contract_account
+owner: Customer Operations
+refresh_cadence: daily
+data_type: integer
+unit: months
+version: 1
+status: active
+tags:
+  - churn_feature
+  - contract
+  - device
+
+source_mappings:
+  - source_system: crm
+    source_table: crm_customers
+    source_fields:
+      - device_activation_date
+    transformation: >
+      SELECT customer_id,
+             (EXTRACT(YEAR FROM AGE(CURRENT_DATE, device_activation_date)) * 12 +
+              EXTRACT(MONTH FROM AGE(CURRENT_DATE, device_activation_date)))::INTEGER
+             AS device_age_months
+      FROM raw.crm_customers
+      WHERE device_activation_date IS NOT NULL
+    target_table: metrics.customer_metrics
+    target_column: device_age_months
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - crm.device_activation_date
+  downstream_consumers:
+    - ml_feature:device_age_months
+    - dashboard:device_lifecycle
+
+dq_rules:
+  - rule_id: device_age_months_completeness
+    name: All customers have a device age
+    dimension: completeness
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE device_age_months IS NULL)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.90
+    fail_threshold: 0.70
+
+  - rule_id: device_age_months_validity
+    name: Device age is non-negative and reasonable
+    dimension: validity
+    check_expression: >
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE device_age_months < 0 OR device_age_months > 120)::FLOAT / NULLIF(COUNT(*),0))
+      FROM metrics.customer_metrics
+    warn_threshold: 0.99
+    fail_threshold: 0.95

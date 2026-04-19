@@ -1,0 +1,8 @@
+# Source System: Billing
+source_id: billing
+name: Billing System
+description: >
+  Revenue management and billing platform. Contains invoices, charges,
+  payment history, plan details, discounts, and overage records.
+system_type: database
+connection_hint: dwh.billing_invoices

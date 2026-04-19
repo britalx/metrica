@@ -1,0 +1,12 @@
+cde_id: network.cell_id
+name: Cell Tower ID
+description: >
+  Identifier of the cell tower serving a measurement or call. Used to
+  correlate signal quality with customer home locations.
+source_system: network
+source_field: cell_id
+data_type: string
+business_owner: Network Engineering
+sensitivity: internal
+update_frequency: hourly
+nullable: false

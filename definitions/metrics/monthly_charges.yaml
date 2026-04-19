@@ -1,0 +1,72 @@
+# Metric: monthly_charges
+# Domain: Billing & Financial
+# Source: Billing system
+
+metric_id: monthly_charges
+name: Monthly Charges
+description: >
+  Total recurring monthly charge on the customer's account, including plan fees,
+  add-on services, and applicable discounts. Key financial metric for revenue
+  tracking and a strong churn predictor — sudden increases often precede churn.
+domain: billing_financial
+owner: Revenue Management
+refresh_cadence: monthly
+data_type: float
+unit: USD
+version: 1
+status: active
+tags:
+  - churn_feature
+  - billing
+  - revenue
+
+source_mappings:
+  - source_system: billing
+    source_table: billing_invoices
+    source_fields:
+      - monthly_charge_amount
+    transformation: >
+      SELECT customer_id, monthly_charge_amount AS monthly_charges
+      FROM billing_invoices
+      WHERE invoice_date = (SELECT MAX(invoice_date) FROM billing_invoices bi
+                            WHERE bi.customer_id = billing_invoices.customer_id)
+    target_table: metrics.customer_metrics
+    target_column: monthly_charges
+
+lineage:
+  upstream_metrics: []
+  upstream_cdes:
+    - billing.monthly_charge_amount
+  downstream_consumers:
+    - dashboard:revenue_overview
+    - ml_feature:monthly_charges
+    - report:arpu_analysis
+    - metric:last_bill_change_pct
+
+dq_rules:
+  - rule_id: monthly_charges_completeness
+    dimension: completeness
+    check_expression: "monthly_charges IS NOT NULL"
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: monthly_charges_validity_range
+    dimension: validity
+    check_expression: "monthly_charges >= 0 AND monthly_charges <= 10000"
+    warn_threshold: 0.99
+    fail_threshold: 0.95
+
+  - rule_id: monthly_charges_consistency_billing
+    dimension: consistency
+    check_expression: >
+      ABS(monthly_charges - (SELECT monthly_charge_amount FROM billing_invoices
+      WHERE customer_id = t.customer_id ORDER BY invoice_date DESC LIMIT 1)) < 0.01
+    warn_threshold: 0.98
+    fail_threshold: 0.90
+
+  - rule_id: monthly_charges_timeliness
+    dimension: timeliness
+    check_expression: >
+      last_updated >= CURRENT_DATE - INTERVAL '35 days'
+    warn_threshold: 0.95
+    fail_threshold: 0.85
