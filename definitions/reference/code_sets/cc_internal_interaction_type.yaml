@@ -1,0 +1,32 @@
+# Variant interaction types used by the Contact Center's internal system.
+# Demonstrates cross-system code divergence: the contact_center system
+# uses uppercase, branded names while the canonical code set uses lowercase.
+system_code: contact_center
+codeset_code: cc_internal_interaction_type
+name: Contact Center Internal Interaction Types
+description: >
+  Internal code values used by the Contact Center's legacy ticketing system.
+  These differ from the canonical interaction_type codes (call/chat/email)
+  and require a crosswalk to translate to the unified channel taxonomy.
+owner_domain: customer_support
+biz_effective_from: "2016-03-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: PHONE
+    label: Phone Call
+    description: Inbound or outbound voice interaction via phone system
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: ONLINE_CHAT
+    label: Online Chat Session
+    description: Web-based live chat interaction
+    biz_effective_from: "2018-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: EMAIL_TICKET
+    label: Email Ticket
+    description: Customer inquiry submitted via email, converted to support ticket
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"

@@ -1,0 +1,24 @@
+# Churn label — binary indicator derived from account status
+system_code: metrica_unified
+codeset_code: churn_label
+name: Churn Label (30-Day)
+description: >
+  Binary classification label indicating whether a customer churned within 30 days.
+  Derived from CRM account_status = 'terminated'. Used as the target variable
+  in the churn prediction model.
+owner_domain: analytics
+biz_effective_from: "2020-01-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: "0"
+    label: Active (Not Churned)
+    description: Customer retained — account_status != 'terminated'
+    biz_effective_from: "2020-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: "1"
+    label: Churned
+    description: Customer churned — account_status = 'terminated' within 30 days
+    biz_effective_from: "2020-01-01"
+    biz_effective_to: "9999-12-31"
