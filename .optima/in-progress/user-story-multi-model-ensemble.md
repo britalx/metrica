@@ -44,6 +44,8 @@ The current Metrica ML pipeline supports a single LogisticRegression model (`Chu
 - `tests/test_mock_data.py`
 - `tests/test_extended_mock_data.py`
 
+Alex Note added: if we are adding imperfect data, I would rather have an indicator for them, the original set of perfect data, could be set as pmd (perfect mock data), and we can delut the data with random (imperfect data), we can then set the level of total imperfection percent for the model disagreement impact and next steps. many thanks.
+
 ---
 
 ## Phase 1: Independent Multi-Model Training
