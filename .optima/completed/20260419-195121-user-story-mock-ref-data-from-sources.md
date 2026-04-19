@@ -116,3 +116,10 @@ Include at least 2 examples of bi-temporal corrections:
 
 ## Estimated Complexity
 **Medium** — primarily content creation (YAML authoring), leveraging existing mock data patterns, with some design work for crosswalk routing rules
+
+
+---
+## Agent Response (2026-04-19 19:51:21)
+**Outcome**: completed
+
+Implemented mock reference data from existing sources: added churn_label + cc_internal_interaction_type code sets (now 9 total), created YAML-to-DuckDB loader script (scripts/load_ref_data.py), loaded 80 records into ref_data_core, verified all 7 semantic layer views. Cross-system translation demo confirmed: billing ACTIVE→crm active (1:1), PHONE→voice_channel (N:1), login→authentication with routing (1:N). Hierarchy point-in-time verified: CELL_005 parent=BOSTON on 2022-12-01, parent=NYC_METRO on 2024-01-01. 80/80 tests pass.
