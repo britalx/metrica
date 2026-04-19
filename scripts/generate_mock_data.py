@@ -21,6 +21,10 @@ random.seed(42)
 NUM_CUSTOMERS = 1000
 DB_PATH = Path(__file__).parent.parent / "data" / "metrica_mock.duckdb"
 
+# Imperfection: percentage of churners that have "good" profiles
+# (simulating competitor poaching, not service dissatisfaction)
+IMPERFECTION_PCT = 0.15  # 15% of churners will have contradictory data
+
 
 def generate_customer_id(i: int) -> str:
     return f"CUST-{i:04d}"
@@ -38,7 +42,11 @@ def create_schemas(conn: duckdb.DuckDBPyConnection):
 
 
 def generate_crm_customers(conn: duckdb.DuckDBPyConnection):
-    """Generate raw.crm_customers — 1,000 customers with DQ issues injected."""
+    """Generate raw.crm_customers — 1,000 customers with DQ issues injected.
+
+    pmd_flag (Perfect Mock Data): TRUE for customers with clean correlated data,
+    FALSE for imperfect/contradictory data (e.g., churners with good profiles).
+    """
     conn.execute("""
         CREATE OR REPLACE TABLE raw.crm_customers (
             customer_id     VARCHAR PRIMARY KEY,
@@ -46,7 +54,8 @@ def generate_crm_customers(conn: duckdb.DuckDBPyConnection):
             account_status  VARCHAR,
             contract_type   VARCHAR,
             reactivation_date DATE,
-            churn_label_30d INTEGER
+            churn_label_30d INTEGER,
+            pmd_flag        BOOLEAN DEFAULT TRUE
         )
     """)
 
@@ -84,13 +93,25 @@ def generate_crm_customers(conn: duckdb.DuckDBPyConnection):
         # In production, churn would be derived from status transitions with a 30-day window.
         churn_label = 1 if status == "terminated" else 0
 
-        rows.append((cid, activation, status, contract, reactivation, churn_label))
+        rows.append((cid, activation, status, contract, reactivation, churn_label, True))
+
+    # Identify churner indices for imperfection injection
+    churner_indices = [i for i, r in enumerate(rows) if r[5] == 1]
+    num_imperfect = max(1, int(len(churner_indices) * IMPERFECTION_PCT))
+    imperfect_churners = set(random.sample(churner_indices, min(num_imperfect, len(churner_indices))))
+
+    # Mark imperfect churners with pmd_flag=False and give them longer tenure (good profile)
+    for idx in imperfect_churners:
+        r = rows[idx]
+        # Give them an older activation date (long tenure = looks loyal)
+        good_activation = random_date(date(2015, 1, 1), date(2018, 6, 1))
+        rows[idx] = (r[0], good_activation, r[2], "two_year", r[4], r[5], False)
 
     # DQ ISSUE: inject 50 null activation_dates (5% completeness issue)
     null_indices = random.sample(range(len(rows)), 50)
     for idx in null_indices:
         r = rows[idx]
-        rows[idx] = (r[0], None, r[2], r[3], r[4], r[5])
+        rows[idx] = (r[0], None, r[2], r[3], r[4], r[5], r[6])
 
     # DQ ISSUE: inject 10 future activation_dates (1% accuracy issue)
     future_indices = random.sample(
@@ -98,15 +119,19 @@ def generate_crm_customers(conn: duckdb.DuckDBPyConnection):
     )
     for idx in future_indices:
         r = rows[idx]
-        rows[idx] = (r[0], date(2027, 1, 1), r[2], r[3], r[4], r[5])
+        rows[idx] = (r[0], date(2027, 1, 1), r[2], r[3], r[4], r[5], r[6])
 
     conn.executemany(
-        "INSERT INTO raw.crm_customers VALUES (?, ?, ?, ?, ?, ?)", rows
+        "INSERT INTO raw.crm_customers VALUES (?, ?, ?, ?, ?, ?, ?)", rows
     )
-    print(f"  raw.crm_customers: {len(rows)} rows (50 null dates, 10 future dates)")
+    num_imperfect_total = sum(1 for r in rows if not r[6])
+    print(f"  raw.crm_customers: {len(rows)} rows (50 null dates, 10 future dates, {num_imperfect_total} imperfect churners)")
+
+    # Return imperfect churner IDs for downstream generators
+    return {r[0] for r in rows if not r[6]}
 
 
-def generate_billing_invoices(conn: duckdb.DuckDBPyConnection):
+def generate_billing_invoices(conn: duckdb.DuckDBPyConnection, imperfect_ids: set[str]):
     """Generate raw.billing_invoices — latest invoice per customer with DQ issues."""
     conn.execute("""
         CREATE OR REPLACE TABLE raw.billing_invoices (
@@ -127,8 +152,12 @@ def generate_billing_invoices(conn: duckdb.DuckDBPyConnection):
         # Invoice date: between 2026-02-01 and 2026-03-31
         inv_date = random_date(date(2026, 2, 1), date(2026, 3, 31))
 
-        # Monthly charge: normal distribution, mean=65, std=25, clamped [15, 300]
-        charge = max(15.0, min(300.0, random.gauss(65, 25)))
+        # Imperfect churners get moderate charges (not high = looks like happy customer)
+        if cid in imperfect_ids:
+            charge = max(30.0, min(80.0, random.gauss(50, 10)))
+        else:
+            # Monthly charge: normal distribution, mean=65, std=25, clamped [15, 300]
+            charge = max(15.0, min(300.0, random.gauss(65, 25)))
         charge = round(charge, 2)
         base = round(charge * 0.80, 2)
         addon = round(charge - base, 2)
@@ -154,7 +183,7 @@ def generate_billing_invoices(conn: duckdb.DuckDBPyConnection):
     print(f"  raw.billing_invoices: {len(rows)} rows (20 negative charges, 30 stale dates)")
 
 
-def generate_contact_center(conn: duckdb.DuckDBPyConnection):
+def generate_contact_center(conn: duckdb.DuckDBPyConnection, imperfect_ids: set[str]):
     """Generate raw.contact_center_interactions with DQ issues."""
     conn.execute("""
         CREATE OR REPLACE TABLE raw.contact_center_interactions (
@@ -173,11 +202,21 @@ def generate_contact_center(conn: duckdb.DuckDBPyConnection):
 
     for i in range(1, NUM_CUSTOMERS + 1):
         cid = generate_customer_id(i)
+        is_imperfect = cid in imperfect_ids
 
+        # Imperfect churners get active-customer distribution (few support calls)
         # Distribution for total interactions (last 60 days):
         # 60% = 0 calls, 25% = 1-2, 10% = 3-5, 5% = 6+
         r = random.random()
-        if r < 0.60:
+        if is_imperfect:
+            # Active-like: mostly 0 interactions
+            if r < 0.70:
+                num_interactions = 0
+            elif r < 0.90:
+                num_interactions = random.randint(1, 2)
+            else:
+                num_interactions = random.randint(3, 4)
+        elif r < 0.60:
             num_interactions = 0
         elif r < 0.85:
             num_interactions = random.randint(1, 3)
@@ -249,7 +288,7 @@ def generate_cdr_records(conn: duckdb.DuckDBPyConnection):
         INSERT INTO raw.cdr_call_records
         WITH customers AS (
             SELECT customer_id,
-                   CASE WHEN account_status = 'terminated' THEN 1 ELSE 0 END AS is_churned
+                   CASE WHEN account_status = 'terminated' AND pmd_flag = TRUE THEN 1 ELSE 0 END AS is_churned
             FROM raw.crm_customers
         ),
         expanded AS (
@@ -338,7 +377,7 @@ def generate_network_measurements(conn: duckdb.DuckDBPyConnection):
         INSERT INTO raw.network_measurements
         WITH customers AS (
             SELECT customer_id,
-                   CASE WHEN account_status = 'terminated' THEN 1 ELSE 0 END AS is_churned,
+                   CASE WHEN account_status = 'terminated' AND pmd_flag = TRUE THEN 1 ELSE 0 END AS is_churned,
                    'CELL-' || LPAD(CAST(1 + abs(hash(customer_id || 'cell')) % 100 AS VARCHAR), 3, '0') AS cell_id
             FROM raw.crm_customers
         ),
@@ -408,7 +447,7 @@ def generate_app_events(conn: duckdb.DuckDBPyConnection):
         INSERT INTO raw.app_events
         WITH customers AS (
             SELECT customer_id,
-                   CASE WHEN account_status = 'terminated' THEN 1 ELSE 0 END AS is_churned
+                   CASE WHEN account_status = 'terminated' AND pmd_flag = TRUE THEN 1 ELSE 0 END AS is_churned
             FROM raw.crm_customers
         ),
         expanded AS (
@@ -657,9 +696,9 @@ def main():
     print(f"Generating mock data -> {DB_PATH}")
 
     create_schemas(conn)
-    generate_crm_customers(conn)
-    generate_billing_invoices(conn)
-    generate_contact_center(conn)
+    imperfect_ids = generate_crm_customers(conn)
+    generate_billing_invoices(conn, imperfect_ids)
+    generate_contact_center(conn, imperfect_ids)
     generate_cdr_records(conn)
     generate_network_measurements(conn)
     generate_app_events(conn)

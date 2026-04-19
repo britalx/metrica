@@ -20,5 +20,15 @@ CREATE TABLE IF NOT EXISTS ml.model_runs (
     dq_gate_threshold   DOUBLE NOT NULL,
     evaluation_json     VARCHAR NOT NULL,
     importances_json    VARCHAR NOT NULL,
-    notes               VARCHAR DEFAULT ''
+    notes               VARCHAR DEFAULT '',
+    run_group_id        VARCHAR,
+    is_champion         BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS ml.model_disagreements (
+    run_group_id    VARCHAR NOT NULL,
+    customer_id     VARCHAR NOT NULL,
+    predictions_json VARCHAR NOT NULL,
+    max_divergence  DOUBLE NOT NULL,
+    flagged         BOOLEAN NOT NULL
 );

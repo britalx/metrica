@@ -44,3 +44,21 @@ class ModelRunResult(BaseModel):
     feature_importances: list[FeatureImportance]
     dq_gate_threshold: float
     notes: str = ""
+    run_group_id: str | None = None
+    is_champion: bool = False
+
+
+class DisagreementRecord(BaseModel):
+    customer_id: str
+    predictions: dict[str, float]  # model_type -> probability
+    max_divergence: float
+    flagged: bool
+
+
+class MultiModelResult(BaseModel):
+    run_group_id: str
+    model_results: list[ModelRunResult]
+    disagreements: list[DisagreementRecord]
+    disagreement_threshold: float
+    flagged_count: int
+    total_customers: int

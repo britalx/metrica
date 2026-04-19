@@ -9,7 +9,7 @@ import duckdb
 import numpy as np
 
 from metrica.ml.dataset import ChurnDataset
-from metrica.ml.models import ModelRunResult
+from metrica.ml.models import ModelRunResult, MultiModelResult, DisagreementRecord
 from metrica.ml.trainer import ChurnModelTrainer
 from metrica.registry.loader import DefinitionLoader
 
@@ -252,3 +252,254 @@ def test_mock_data_has_churn_column(tmp_path):
     assert "churn_label_30d" in metric_col_names
 
     conn.close()
+
+
+# ── Multi-model tests ────────────────────────────────────────────────
+
+
+def test_train_multi_returns_multi_model_result(tmp_path):
+    """train_multi() returns a MultiModelResult with multiple model results."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    assert isinstance(result, MultiModelResult)
+    assert len(result.model_results) == 3  # LR + RF + GB
+    assert result.run_group_id.startswith("group-")
+
+
+def test_train_multi_all_models_have_same_group(tmp_path):
+    """All model results share the same run_group_id."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    group_ids = {r.run_group_id for r in result.model_results}
+    assert len(group_ids) == 1
+    assert result.run_group_id in group_ids
+
+
+def test_train_multi_model_types(tmp_path):
+    """train_multi trains all three default model types."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    model_types = {r.model_type for r in result.model_results}
+    assert model_types == {"logistic_regression", "random_forest", "gradient_boosting"}
+
+
+def test_train_multi_selective_models(tmp_path):
+    """train_multi with specific model_types only trains those."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(
+        enforce_dq_gate=False,
+        model_types=["logistic_regression", "random_forest"],
+    )
+
+    assert len(result.model_results) == 2
+    types = {r.model_type for r in result.model_results}
+    assert types == {"logistic_regression", "random_forest"}
+
+
+def test_train_multi_persists_all_runs(tmp_path):
+    """All model runs are persisted to ml.model_runs with run_group_id."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    conn = duckdb.connect(db_path, read_only=True)
+    count = conn.execute("SELECT COUNT(*) FROM ml.model_runs").fetchone()[0]
+    group_count = conn.execute(
+        "SELECT COUNT(*) FROM ml.model_runs WHERE run_group_id = ?",
+        [result.run_group_id],
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == 3
+    assert group_count == 3
+
+
+def test_train_multi_each_model_has_valid_eval(tmp_path):
+    """Each model result has valid evaluation metrics."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    for mr in result.model_results:
+        assert 0.0 <= mr.evaluation.auc_roc <= 1.0
+        assert 0.0 <= mr.evaluation.accuracy <= 1.0
+        assert len(mr.feature_importances) > 0
+
+
+# ── Disagreement tracking tests ──────────────────────────────────────
+
+
+def test_disagreements_returned(tmp_path):
+    """train_multi returns disagreement records."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    assert isinstance(result.disagreements, list)
+    assert len(result.disagreements) > 0
+    assert all(isinstance(d, DisagreementRecord) for d in result.disagreements)
+
+
+def test_disagreement_fields_valid(tmp_path):
+    """Each disagreement record has valid fields."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    for d in result.disagreements:
+        assert isinstance(d.customer_id, str)
+        assert len(d.predictions) == 3  # 3 models
+        assert 0.0 <= d.max_divergence <= 1.0
+        assert isinstance(d.flagged, bool)
+
+
+def test_disagreement_flagging_threshold(tmp_path):
+    """Flagged customers have max_divergence > threshold."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False, disagreement_threshold=0.3)
+
+    for d in result.disagreements:
+        if d.flagged:
+            assert d.max_divergence > 0.3
+        else:
+            assert d.max_divergence <= 0.3
+
+    assert result.flagged_count == sum(1 for d in result.disagreements if d.flagged)
+
+
+def test_disagreements_persisted(tmp_path):
+    """Disagreements are persisted to ml.model_disagreements."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    conn = duckdb.connect(db_path, read_only=True)
+    count = conn.execute(
+        "SELECT COUNT(*) FROM ml.model_disagreements WHERE run_group_id = ?",
+        [result.run_group_id],
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == len(result.disagreements)
+
+
+# ── Champion/Challenger tests ────────────────────────────────────────
+
+
+def test_promote_champion(tmp_path):
+    """promote_champion sets is_champion=TRUE for the given run_id."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    best = max(result.model_results, key=lambda r: r.evaluation.auc_roc)
+    trainer.promote_champion(best.run_id)
+
+    conn = duckdb.connect(db_path, read_only=True)
+    champ = conn.execute(
+        "SELECT run_id FROM ml.model_runs WHERE is_champion = TRUE"
+    ).fetchone()
+    conn.close()
+
+    assert champ is not None
+    assert champ[0] == best.run_id
+
+
+def test_get_champion(tmp_path):
+    """get_champion returns the current champion's run_id."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    # No champion initially
+    assert trainer.get_champion() is None
+
+    # Promote one
+    best = result.model_results[0]
+    trainer.promote_champion(best.run_id)
+    assert trainer.get_champion() == best.run_id
+
+
+def test_champion_swap(tmp_path):
+    """Promoting a new champion demotes the old one."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(enforce_dq_gate=False)
+
+    first = result.model_results[0]
+    second = result.model_results[1]
+
+    trainer.promote_champion(first.run_id)
+    assert trainer.get_champion() == first.run_id
+
+    trainer.promote_champion(second.run_id)
+    assert trainer.get_champion() == second.run_id
+
+    # Only one champion
+    conn = duckdb.connect(db_path, read_only=True)
+    champ_count = conn.execute(
+        "SELECT COUNT(*) FROM ml.model_runs WHERE is_champion = TRUE"
+    ).fetchone()[0]
+    conn.close()
+    assert champ_count == 1
+
+
+# ── PMD flag / imperfect data tests ──────────────────────────────────
+
+
+def test_pmd_flag_in_mock_data():
+    """raw.crm_customers has pmd_flag column in the real mock DB."""
+    db_path = Path(__file__).parent.parent / "data" / "metrica_mock.duckdb"
+    if not db_path.exists():
+        return  # skip if mock DB not generated
+
+    conn = duckdb.connect(str(db_path), read_only=True)
+    cols = conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema='raw' AND table_name='crm_customers'"
+    ).fetchall()
+    col_names = {r[0] for r in cols}
+    conn.close()
+
+    assert "pmd_flag" in col_names
+
+
+def test_imperfect_churners_exist():
+    """Some churners have pmd_flag=FALSE (imperfect data)."""
+    db_path = Path(__file__).parent.parent / "data" / "metrica_mock.duckdb"
+    if not db_path.exists():
+        return  # skip if mock DB not generated
+
+    conn = duckdb.connect(str(db_path), read_only=True)
+    imperfect = conn.execute(
+        "SELECT COUNT(*) FROM raw.crm_customers "
+        "WHERE churn_label_30d = 1 AND pmd_flag = FALSE"
+    ).fetchone()[0]
+    total_churners = conn.execute(
+        "SELECT COUNT(*) FROM raw.crm_customers WHERE churn_label_30d = 1"
+    ).fetchone()[0]
+    conn.close()
+
+    assert imperfect > 0
+    assert imperfect < total_churners  # not all churners are imperfect
