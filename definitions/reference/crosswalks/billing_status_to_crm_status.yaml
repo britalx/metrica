@@ -1,0 +1,27 @@
+# One-to-One crosswalk: Billing account status → CRM account status
+source_system: billing
+target_system: crm
+crosswalk_code: billing_status_to_crm_status
+name: Billing Account Status to CRM Status
+description: >
+  Maps billing system uppercase status codes to CRM system lowercase status codes.
+  Direct one-to-one mapping with no ambiguity.
+mapping_type: one-to-one
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"
+
+mappings:
+  - source_code: ACTIVE
+    target_code: active
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - source_code: SUSP
+    target_code: suspended
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - source_code: TERM
+    target_code: terminated
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"

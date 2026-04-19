@@ -1,0 +1,27 @@
+system_code: contact_center
+codeset_code: ticket_resolution
+name: Ticket Resolution Status
+description: >
+  Resolution status of a customer support ticket.
+owner_domain: customer_support
+biz_effective_from: "2016-03-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: resolved
+    label: Resolved
+    description: Ticket resolved and closed successfully.
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: pending
+    label: Pending
+    description: Ticket is open and awaiting resolution.
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: escalated
+    label: Escalated
+    description: Ticket escalated to a higher support tier.
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"

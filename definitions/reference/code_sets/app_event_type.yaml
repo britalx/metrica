@@ -1,0 +1,39 @@
+system_code: app_events
+codeset_code: app_event_type
+name: App Event Type
+description: >
+  Types of events tracked in the mobile self-service app.
+owner_domain: digital_channels
+biz_effective_from: "2020-01-15"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: login
+    label: Login
+    description: Customer logged into the app.
+    biz_effective_from: "2020-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - code: view_bill
+    label: View Bill
+    description: Customer viewed their bill details.
+    biz_effective_from: "2020-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - code: pay_bill
+    label: Pay Bill
+    description: Customer made a payment through the app.
+    biz_effective_from: "2020-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - code: speed_test
+    label: Speed Test
+    description: Customer ran a network speed test.
+    biz_effective_from: "2020-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: change_plan
+    label: Change Plan
+    description: Customer initiated a plan change.
+    biz_effective_from: "2021-03-01"
+    biz_effective_to: "9999-12-31"

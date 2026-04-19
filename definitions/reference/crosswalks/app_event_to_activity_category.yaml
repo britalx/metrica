@@ -1,0 +1,42 @@
+# One-to-Many crosswalk: Generic event type → specific activity category
+# Requires CASE WHEN routing logic based on source system context.
+source_system: app_events
+target_system: metrica_unified
+crosswalk_code: app_event_to_activity_category
+name: App Event to Activity Category
+description: >
+  Maps app event types to unified activity categories. The same event type
+  can map to different target categories depending on which source system
+  the event originated from. Uses routing rules with CASE WHEN logic.
+mapping_type: one-to-many
+biz_effective_from: "2020-01-15"
+biz_effective_to: "9999-12-31"
+
+mappings:
+  - source_code: login
+    routing_rules:
+      - when: "source_system = 'app_events'"
+        target_code: authentication
+      - when: "source_system = 'crm'"
+        target_code: account_access
+      - default: unknown_login
+    biz_effective_from: "2020-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - source_code: pay_bill
+    routing_rules:
+      - when: "source_system = 'app_events'"
+        target_code: mobile_payment
+      - when: "source_system = 'billing'"
+        target_code: system_payment
+      - default: unknown_payment
+    biz_effective_from: "2020-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - source_code: view_bill
+    routing_rules:
+      - when: "source_system = 'app_events'"
+        target_code: self_service
+      - default: billing_inquiry
+    biz_effective_from: "2020-01-15"
+    biz_effective_to: "9999-12-31"

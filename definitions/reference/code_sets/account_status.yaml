@@ -1,0 +1,27 @@
+system_code: crm
+codeset_code: account_status
+name: Account Status
+description: >
+  Customer account lifecycle status as tracked in the CRM system.
+owner_domain: customer_management
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: active
+    label: Active
+    description: Customer account is active and in good standing.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: suspended
+    label: Suspended
+    description: Account temporarily suspended (non-payment or customer request).
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: terminated
+    label: Terminated
+    description: Account permanently closed. Customer has churned.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"

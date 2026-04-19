@@ -1,0 +1,27 @@
+system_code: crm
+codeset_code: contract_type
+name: Contract Type
+description: >
+  Customer contract commitment level as tracked in the CRM system.
+owner_domain: customer_management
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: month_to_month
+    label: Month-to-Month
+    description: No long-term commitment. Customer can cancel anytime.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: one_year
+    label: One Year
+    description: 12-month contract with early termination fee.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: two_year
+    label: Two Year
+    description: 24-month contract with early termination fee.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"

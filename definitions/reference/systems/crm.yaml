@@ -1,0 +1,10 @@
+system_code: crm
+name: CRM System
+description: >
+  Primary customer relationship management system. Contains customer profiles,
+  account details, activation dates, contract information, and service history.
+business_domain: customer_management
+classification: data_warehouse
+lifecycle_status: prod
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"

@@ -1,0 +1,10 @@
+system_code: app_events
+name: Mobile App
+description: >
+  Event stream from the mobile self-service app. Tracks logins, page views,
+  speed tests, and feature usage within the app.
+business_domain: digital_channels
+classification: data_product
+lifecycle_status: prod
+biz_effective_from: "2020-01-15"
+biz_effective_to: "9999-12-31"

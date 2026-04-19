@@ -1,0 +1,128 @@
+# Hierarchy with reparenting example (CELL_005 moved between markets)
+system_code: network
+hierarchy_code: network_coverage
+name: Network Coverage Hierarchy
+description: >
+  Hierarchical structure of the wireless network coverage areas.
+  Region → Market → Cell Sector. Each cell sector belongs to exactly
+  one market at any given time.
+levels:
+  - region
+  - market
+  - cell_sector
+biz_effective_from: "2017-06-01"
+biz_effective_to: "9999-12-31"
+
+nodes:
+  # --- Regions (Level 1) ---
+  - node_code: NORTHEAST
+    level: region
+    parent_code: null
+    label: Northeast Region
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: SOUTHEAST
+    level: region
+    parent_code: null
+    label: Southeast Region
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: WEST
+    level: region
+    parent_code: null
+    label: West Region
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  # --- Markets (Level 2) ---
+  - node_code: NYC_METRO
+    level: market
+    parent_code: NORTHEAST
+    label: New York City Metro
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: BOSTON
+    level: market
+    parent_code: NORTHEAST
+    label: Boston Metro
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: MIAMI
+    level: market
+    parent_code: SOUTHEAST
+    label: Miami Metro
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: LA_METRO
+    level: market
+    parent_code: WEST
+    label: Los Angeles Metro
+    biz_effective_from: "2017-06-01"
+    biz_effective_to: "9999-12-31"
+
+  # --- Cell Sectors (Level 3) ---
+  - node_code: CELL_001
+    level: cell_sector
+    parent_code: NYC_METRO
+    label: Manhattan Downtown Sector 1
+    biz_effective_from: "2018-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: CELL_002
+    level: cell_sector
+    parent_code: NYC_METRO
+    label: Manhattan Midtown Sector 2
+    biz_effective_from: "2018-01-15"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: CELL_010
+    level: cell_sector
+    parent_code: BOSTON
+    label: Boston Harbor Sector
+    biz_effective_from: "2018-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: CELL_020
+    level: cell_sector
+    parent_code: MIAMI
+    label: Miami Beach Sector
+    biz_effective_from: "2019-03-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: CELL_030
+    level: cell_sector
+    parent_code: LA_METRO
+    label: Downtown LA Sector 1
+    biz_effective_from: "2019-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - node_code: CELL_031
+    level: cell_sector
+    parent_code: LA_METRO
+    label: Hollywood Sector
+    biz_effective_from: "2019-06-01"
+    biz_effective_to: "9999-12-31"
+
+  # --- Reparenting Example ---
+  # CELL_005 was originally under BOSTON, then moved to NYC_METRO on 2023-07-01.
+  # Two records with non-overlapping business date ranges demonstrate
+  # bi-temporal reparenting without losing history.
+
+  - node_code: CELL_005
+    level: cell_sector
+    parent_code: BOSTON
+    label: Connecticut Border Sector
+    biz_effective_from: "2019-01-01"
+    biz_effective_to: "2023-06-30"
+
+  - node_code: CELL_005
+    level: cell_sector
+    parent_code: NYC_METRO
+    label: Connecticut Border Sector
+    biz_effective_from: "2023-07-01"
+    biz_effective_to: "9999-12-31"

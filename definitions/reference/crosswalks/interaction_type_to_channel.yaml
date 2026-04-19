@@ -1,0 +1,33 @@
+# Many-to-One crosswalk: Multiple interaction types → unified channel category
+source_system: contact_center
+target_system: metrica_unified
+crosswalk_code: interaction_type_to_channel
+name: Interaction Type to Channel
+description: >
+  Collapses multiple source interaction types (from contact center and its
+  variant codes) into a unified channel category for analytics.
+mapping_type: many-to-one
+biz_effective_from: "2016-03-01"
+biz_effective_to: "9999-12-31"
+
+mappings:
+  - source_codes:
+      - call
+      - PHONE
+    target_code: voice_channel
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"
+
+  - source_codes:
+      - chat
+      - ONLINE_CHAT
+    target_code: digital_channel
+    biz_effective_from: "2018-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - source_codes:
+      - email
+      - EMAIL_TICKET
+    target_code: digital_channel
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"

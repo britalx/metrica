@@ -1,0 +1,10 @@
+system_code: metrica_unified
+name: Metrica Unified
+description: >
+  Canonical analytics layer. Target system for all crosswalk translations.
+  Defines the unified code values used across metrics, features, and ML models.
+business_domain: analytics
+classification: data_product
+lifecycle_status: prod
+biz_effective_from: "2024-01-01"
+biz_effective_to: "9999-12-31"

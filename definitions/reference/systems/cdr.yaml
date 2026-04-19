@@ -1,0 +1,11 @@
+system_code: cdr
+name: CDR Platform
+description: >
+  Call detail record system capturing all voice, SMS, and data usage events.
+  Primary source for usage behavior metrics including call duration, data
+  consumption, and roaming activity.
+business_domain: network_usage
+classification: data_warehouse
+lifecycle_status: prod
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"

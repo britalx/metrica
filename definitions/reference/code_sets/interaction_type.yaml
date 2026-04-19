@@ -1,0 +1,27 @@
+system_code: contact_center
+codeset_code: interaction_type
+name: Interaction Type
+description: >
+  Channel through which a customer support interaction occurred.
+owner_domain: customer_support
+biz_effective_from: "2016-03-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: call
+    label: Phone Call
+    description: Voice call to the contact center.
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: chat
+    label: Live Chat
+    description: Online chat session with a support agent.
+    biz_effective_from: "2018-06-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: email
+    label: Email
+    description: Email-based support interaction.
+    biz_effective_from: "2016-03-01"
+    biz_effective_to: "9999-12-31"

@@ -1,0 +1,10 @@
+system_code: network
+name: Network Operations
+description: >
+  Network operations center data including signal measurements, outage events,
+  cell tower performance, and throttling policy enforcement records.
+business_domain: network_operations
+classification: data_warehouse
+lifecycle_status: prod
+biz_effective_from: "2017-06-01"
+biz_effective_to: "9999-12-31"

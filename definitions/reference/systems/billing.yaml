@@ -1,0 +1,10 @@
+system_code: billing
+name: Billing System
+description: >
+  Revenue management and billing platform. Contains invoices, charges,
+  payment history, plan details, discounts, and overage records.
+business_domain: revenue
+classification: data_warehouse
+lifecycle_status: prod
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"

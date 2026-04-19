@@ -1,0 +1,27 @@
+system_code: cdr
+codeset_code: call_type
+name: Call Type
+description: >
+  Type of usage event recorded in the CDR system.
+owner_domain: network_usage
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: voice
+    label: Voice Call
+    description: Traditional voice call.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: data
+    label: Data Session
+    description: Mobile data usage session.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: sms
+    label: SMS
+    description: Short message service event.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"

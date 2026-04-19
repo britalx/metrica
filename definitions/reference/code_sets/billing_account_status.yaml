@@ -1,0 +1,30 @@
+# Billing system uses UPPERCASE codes — different from CRM's lowercase values.
+# This demonstrates cross-system code divergence requiring crosswalk translation.
+system_code: billing
+codeset_code: billing_account_status
+name: Billing Account Status
+description: >
+  Account status as represented in the billing system. Uses uppercase codes
+  that differ from the CRM system's lowercase representation.
+owner_domain: revenue
+biz_effective_from: "2015-01-01"
+biz_effective_to: "9999-12-31"
+
+values:
+  - code: ACTIVE
+    label: Active Account
+    description: Billing account is active.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: SUSP
+    label: Suspended Account
+    description: Billing suspended due to non-payment.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
+
+  - code: TERM
+    label: Terminated Account
+    description: Billing account terminated and final bill issued.
+    biz_effective_from: "2015-01-01"
+    biz_effective_to: "9999-12-31"
