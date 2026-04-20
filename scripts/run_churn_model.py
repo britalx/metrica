@@ -22,20 +22,22 @@ DB_PATH = Path(__file__).parent.parent / "data" / "metrica_mock.duckdb"
 DEFINITIONS_ROOT = Path(__file__).parent.parent / "definitions"
 
 
-def run_training(enforce_gate: bool) -> None:
+def run_training(enforce_gate: bool, target_variable: str = "churn_label_30d") -> None:
     trainer = ChurnModelTrainer(DB_PATH, DEFINITIONS_ROOT)
 
-    print("Metrica Churn Model — Baseline Training")
+    print(f"Metrica Model — Baseline Training  [target: {target_variable}]")
     print("=" * 40)
     print("Building feature matrix...")
 
-    result = trainer.train_baseline(enforce_dq_gate=enforce_gate)
+    result = trainer.train_baseline(
+        enforce_dq_gate=enforce_gate, target_variable=target_variable,
+    )
 
     print(f"  Features in X:      {len(result.features_used)}")
     print(f"  Features gated out: {len(result.features_gated)}")
     print()
     print(f"Dataset: {result.training_customers + result.test_customers} customers "
-          f"| {result.churn_rate_train:.1%} churn rate (train)")
+          f"| {result.churn_rate_train:.1%} positive rate (train)")
     print(f"Split: {result.training_customers} train / {result.test_customers} test (stratified)")
     print()
     print(f"Training LogisticRegression(class_weight='balanced', max_iter=1000)...")
@@ -137,11 +139,16 @@ def show_importances() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Metrica Churn Model CLI")
+    parser = argparse.ArgumentParser(description="Metrica Model CLI")
     parser.add_argument("--train", action="store_true", help="Train baseline model")
     parser.add_argument("--no-gate", action="store_true", help="Disable DQ gate")
     parser.add_argument("--results", action="store_true", help="Show last model run results")
     parser.add_argument("--importances", action="store_true", help="Show feature importances")
+    parser.add_argument(
+        "--target", default="churn_label_30d",
+        help="Target column in metrics.customer_metrics "
+             "(e.g. 'churn_label_30d' or 'late_payment_flag')",
+    )
 
     args = parser.parse_args()
 
@@ -150,7 +157,7 @@ def main() -> None:
         sys.exit(1)
 
     if args.train:
-        run_training(enforce_gate=not args.no_gate)
+        run_training(enforce_gate=not args.no_gate, target_variable=args.target)
 
     if args.results:
         show_results()

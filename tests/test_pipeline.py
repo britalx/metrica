@@ -141,13 +141,13 @@ def test_runner_all_metrics():
     assert result.status == PipelineStatus.SUCCESS
 
 
-def test_runner_all_50_metrics_attempted():
-    """Running all metrics shows 50 attempted, 3 succeed (pilot), rest fail (no mock tables)."""
+def test_runner_all_52_metrics_attempted():
+    """Running all metrics shows 52 attempted, 3 succeed (pilot), rest fail (no mock tables)."""
     db_path, _ = _make_runner_db()
     runner = PipelineRunner(db_path, DEFINITIONS_ROOT)
     result = runner.run()
 
-    assert result.metrics_attempted == 51
+    assert result.metrics_attempted == 52
     assert result.metrics_succeeded == 3
     assert result.status == PipelineStatus.PARTIAL
 

@@ -43,14 +43,15 @@ def _setup_db(db_path: str) -> str:
             rows.append((cid, "2022-01-15", "active", 0))
     conn.executemany("INSERT INTO raw.crm_customers VALUES (?, ?, ?, ?)", rows)
 
-    # Metrics table with a few features + churn label
+    # Metrics table with a few features + churn label + late_payment_flag
     conn.execute("""
         CREATE OR REPLACE TABLE metrics.customer_metrics (
             customer_id VARCHAR PRIMARY KEY,
             tenure_months DOUBLE,
             monthly_charges DOUBLE,
             support_calls_30d INTEGER,
-            churn_label_30d INTEGER
+            churn_label_30d INTEGER,
+            late_payment_flag INTEGER
         )
     """)
 
@@ -63,8 +64,13 @@ def _setup_db(db_path: str) -> str:
         charges = round(random.gauss(65, 25), 2)
         calls = random.randint(0, 10)
         churn = 1 if i >= 37 else 0
-        metric_rows.append((cid, tenure, charges, calls, churn))
-    conn.executemany("INSERT INTO metrics.customer_metrics VALUES (?, ?, ?, ?, ?)", metric_rows)
+        # late_payment_flag: 4 late payers correlated with low tenure & high charges
+        # Customers 1-4 (low customer_id) are late payers.
+        late = 1 if i <= 4 else 0
+        metric_rows.append((cid, tenure, charges, calls, churn, late))
+    conn.executemany(
+        "INSERT INTO metrics.customer_metrics VALUES (?, ?, ?, ?, ?, ?)", metric_rows,
+    )
 
     # DQ tables
     conn.execute("""
@@ -503,3 +509,118 @@ def test_imperfect_churners_exist():
 
     assert imperfect > 0
     assert imperfect < total_churners  # not all churners are imperfect
+
+
+# ── Payment default prediction (late_payment_flag target) ────────────
+
+
+def test_late_payment_yaml_loads():
+    """definitions/metrics/late_payment_flag.yaml loads via DefinitionLoader."""
+    loader = DefinitionLoader(DEFINITIONS_ROOT)
+    metrics = {m.metric_id: m for m in loader.metrics()}
+    assert "late_payment_flag" in metrics
+    assert metrics["late_payment_flag"].domain.value == "derived_engineered"
+
+
+def test_late_payment_yaml_has_dq_rules():
+    """The late_payment_flag YAML has completeness + validity DQ rules."""
+    loader = DefinitionLoader(DEFINITIONS_ROOT)
+    dq_rules_by_metric = loader.metric_dq_rules()
+    assert "late_payment_flag" in dq_rules_by_metric
+    rules = dq_rules_by_metric["late_payment_flag"]
+    dimensions = {r.dimension.value for r in rules}
+    assert "completeness" in dimensions
+    assert "validity" in dimensions
+
+
+def test_dataset_builds_with_late_payment_target(tmp_path):
+    """ChurnDataset.build(target_column='late_payment_flag') returns correct y."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    ds = ChurnDataset(Path(db_path), DEFINITIONS_ROOT)
+    X, y, feature_names, _ = ds.build(
+        enforce_dq_gate=False, target_column="late_payment_flag",
+    )
+
+    # Target is excluded from features.
+    assert "late_payment_flag" not in feature_names
+    # Default churn label is always excluded too (no label leakage).
+    assert "churn_label_30d" not in feature_names
+    # 4 late payers in the fixture.
+    assert int(y.sum()) == 4
+
+
+def test_train_multi_with_late_payment_target(tmp_path):
+    """train_multi trains on late_payment_flag and persists the target."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(
+        enforce_dq_gate=False, target_variable="late_payment_flag",
+    )
+
+    assert isinstance(result, MultiModelResult)
+    assert len(result.model_results) == 3
+    for mr in result.model_results:
+        assert mr.target_variable == "late_payment_flag"
+        assert 0.0 <= mr.evaluation.auc_roc <= 1.0
+        assert len(mr.feature_importances) > 0
+
+
+def test_train_multi_target_persisted(tmp_path):
+    """target_variable column persists alongside each model run."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_multi(
+        enforce_dq_gate=False, target_variable="late_payment_flag",
+    )
+
+    conn = duckdb.connect(db_path, read_only=True)
+    target_values = conn.execute(
+        "SELECT DISTINCT target_variable FROM ml.model_runs WHERE run_group_id = ?",
+        [result.run_group_id],
+    ).fetchall()
+    conn.close()
+
+    assert len(target_values) == 1
+    assert target_values[0][0] == "late_payment_flag"
+
+
+def test_train_baseline_with_late_payment_target(tmp_path):
+    """train_baseline supports the late_payment_flag target."""
+    db_path = str(tmp_path / "test.duckdb")
+    _setup_db(db_path)
+    trainer = ChurnModelTrainer(Path(db_path), DEFINITIONS_ROOT)
+    result = trainer.train_baseline(
+        enforce_dq_gate=False, target_variable="late_payment_flag",
+    )
+
+    assert result.target_variable == "late_payment_flag"
+    # Positive class rate stored under the legacy field name.
+    assert result.churn_rate_train > 0.0
+
+
+def test_late_payment_in_mock_data():
+    """The generated mock DB (if present) contains the late_payment_flag column
+    with a realistic positive-class rate."""
+    db_path = Path(__file__).parent.parent / "data" / "metrica_mock.duckdb"
+    if not db_path.exists():
+        return  # skip if mock DB not generated
+
+    conn = duckdb.connect(str(db_path), read_only=True)
+    cols = conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema='metrics' AND table_name='customer_metrics'"
+    ).fetchall()
+    col_names = {r[0] for r in cols}
+    assert "late_payment_flag" in col_names
+
+    total, positives = conn.execute(
+        "SELECT COUNT(*), SUM(late_payment_flag) FROM metrics.customer_metrics"
+    ).fetchone()
+    conn.close()
+
+    rate = (positives or 0) / total if total else 0.0
+    # Generator targets 8-12%, allow 2%-25% to absorb stochastic variation.
+    assert 0.02 <= rate <= 0.25, f"unexpected late_payment_flag rate: {rate:.2%}"

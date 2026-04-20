@@ -65,10 +65,12 @@ class ChurnModelTrainer:
         test_size: float = 0.2,
         enforce_dq_gate: bool = True,
         max_iter: int = 1000,
+        target_variable: str = "churn_label_30d",
     ) -> ModelRunResult:
         """Full training pipeline: build data, split, scale, train, evaluate, persist."""
         X, y, feature_names, gated_metrics = self._dataset.build(
             enforce_dq_gate=enforce_dq_gate,
+            target_column=target_variable,
         )
 
         # Train/test split (stratified)
@@ -142,6 +144,7 @@ class ChurnModelTrainer:
             evaluation=evaluation,
             feature_importances=importances,
             dq_gate_threshold=self._dataset.fs._gate_threshold,
+            target_variable=target_variable,
         )
 
         # Persist to DB
@@ -158,6 +161,7 @@ class ChurnModelTrainer:
         enforce_dq_gate: bool = True,
         model_types: list[str] | None = None,
         disagreement_threshold: float = 0.3,
+        target_variable: str = "churn_label_30d",
     ) -> MultiModelResult:
         """Train multiple models independently on the same split, with disagreement tracking.
 
@@ -175,6 +179,7 @@ class ChurnModelTrainer:
 
         X, y, feature_names, gated_metrics = self._dataset.build(
             enforce_dq_gate=enforce_dq_gate,
+            target_column=target_variable,
         )
 
         # Shared train/test split
@@ -242,6 +247,7 @@ class ChurnModelTrainer:
                 feature_importances=importances,
                 dq_gate_threshold=self._dataset.fs._gate_threshold,
                 run_group_id=run_group_id,
+                target_variable=target_variable,
             )
 
             self._persist_result(result, conn)
@@ -367,9 +373,22 @@ class ChurnModelTrainer:
                 importances_json    VARCHAR NOT NULL,
                 notes               VARCHAR DEFAULT '',
                 run_group_id        VARCHAR,
-                is_champion         BOOLEAN DEFAULT FALSE
+                is_champion         BOOLEAN DEFAULT FALSE,
+                target_variable     VARCHAR DEFAULT 'churn_label_30d'
             )
         """)
+        # Migrate pre-existing tables that predate the target_variable column.
+        existing_cols = {
+            row[0] for row in conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema='ml' AND table_name='model_runs'"
+            ).fetchall()
+        }
+        if "target_variable" not in existing_cols:
+            conn.execute(
+                "ALTER TABLE ml.model_runs ADD COLUMN target_variable VARCHAR "
+                "DEFAULT 'churn_label_30d'"
+            )
 
     def _ensure_disagreement_table(self, conn: duckdb.DuckDBPyConnection) -> None:
         conn.execute("""
@@ -384,9 +403,13 @@ class ChurnModelTrainer:
 
     def _persist_result(self, result: ModelRunResult, conn: duckdb.DuckDBPyConnection) -> None:
         conn.execute(
-            """INSERT INTO ml.model_runs VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )""",
+            """INSERT INTO ml.model_runs (
+                run_id, model_type, trained_at, training_customers, test_customers,
+                features_used_json, features_gated_json, churn_rate_train, churn_rate_test,
+                auc_roc, avg_precision, accuracy, precision_score, recall_score, f1_score,
+                dq_gate_threshold, evaluation_json, importances_json, notes,
+                run_group_id, is_champion, target_variable
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 result.run_id,
                 result.model_type,
@@ -409,5 +432,6 @@ class ChurnModelTrainer:
                 result.notes,
                 result.run_group_id,
                 result.is_champion,
+                result.target_variable,
             ],
         )

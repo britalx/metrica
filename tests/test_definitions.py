@@ -29,7 +29,7 @@ def test_load_cdes():
 def test_load_metrics():
     loader = DefinitionLoader(DEFINITIONS_ROOT)
     metrics = loader.metrics()
-    assert len(metrics) == 51
+    assert len(metrics) == 52
 
     by_id = {m.metric_id: m for m in metrics}
 

@@ -22,17 +22,27 @@ class ChurnDataset:
         self,
         exclude_metrics: list[str] | None = None,
         enforce_dq_gate: bool = True,
+        target_column: str = "churn_label_30d",
     ) -> tuple[np.ndarray, np.ndarray, list[str], list[str]]:
         """Build X, y arrays for model training.
 
+        Args:
+            exclude_metrics: Extra metric_ids to exclude from features.
+            enforce_dq_gate: Whether to apply the Feature Store DQ gate.
+            target_column: Name of the column in metrics.customer_metrics to use as y.
+                           Also excluded from the feature set.
+
         Returns:
             X: float32 array (n_customers, n_features), NULLs imputed with median
-            y: int array (n_customers,) — churn labels
+            y: int array (n_customers,) — target labels
             feature_names: metric_ids corresponding to X columns
             gated_metrics: metric_ids excluded by DQ gate
         """
         exclude = set(exclude_metrics or [])
-        exclude.add("churn_label_30d")  # target, not a feature
+        # Always exclude both the requested target and the default churn label
+        # so multi-target datasets never leak labels between models.
+        exclude.add(target_column)
+        exclude.add("churn_label_30d")
 
         # Get the feature matrix (DQ-gated)
         matrix = self.fs.get_feature_matrix(enforce_dq_gate=enforce_dq_gate)
@@ -41,10 +51,10 @@ class ChurnDataset:
         # Filter out excluded metrics from served list
         feature_names = [m for m in matrix.metrics_served if m not in exclude]
 
-        # Pull labels directly from DB
+        # Pull labels directly from DB (quote identifier defensively)
         conn = duckdb.connect(str(self.db_path), read_only=True)
         label_rows = conn.execute(
-            "SELECT customer_id, churn_label_30d FROM metrics.customer_metrics "
+            f'SELECT customer_id, "{target_column}" FROM metrics.customer_metrics '
             "ORDER BY customer_id"
         ).fetchall()
         conn.close()

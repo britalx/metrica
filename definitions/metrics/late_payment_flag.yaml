@@ -1,0 +1,79 @@
+metric_id: late_payment_flag
+name: "Late Payment Flag (Default Prediction Label)"
+description: >
+  Binary late-payment / payment-default indicator: 1 if the customer's payment
+  is received more than 7 days after the due date, or not received within 30
+  days of the due date; 0 if on-time. Used as the target variable for the
+  payment default prediction model.
+  NOTE: In mock data, approximated from correlated signals (tenure, charges,
+  contract_type, app login frequency) plus ~10% imperfect defaulters injected
+  to represent life-event-driven defaults that pure feature correlations can
+  not predict.
+domain: derived_engineered
+owner: "revenue-assurance"
+refresh_cadence: daily
+data_type: integer
+unit: binary_flag
+source_mappings:
+  - source_system: billing
+    source_table: raw.billing_invoices
+    source_fields:
+      - invoice_date
+      - monthly_charge_amount
+    transformation: |
+      -- In production: derived from payment_date vs due_date per invoice
+      -- and aggregated to a per-customer 30-day rolling flag.
+      -- In mock data: generated in compute_metrics() of generate_mock_data.py
+      -- from correlated risk signals.
+      CASE WHEN DATEDIFF('day', due_date, payment_date) > 7 THEN 1
+           WHEN payment_date IS NULL
+                AND DATEDIFF('day', due_date, CURRENT_DATE) > 30 THEN 1
+           ELSE 0 END
+lineage:
+  upstream_cdes:
+    - billing.invoice_date
+    - billing.monthly_charge_amount
+    - crm.contract_type
+    - crm.activation_date
+    - app_events.event_type
+  downstream_consumers:
+    - ml.payment_default_model_baseline
+    - ml.payment_default_model_multi
+dq_rules:
+  - rule_id: late_payment_flag_completeness
+    name: "All customers have a late-payment label"
+    dimension: completeness
+    check_expression: |
+      SELECT 1.0 - (COUNT(*) FILTER (WHERE late_payment_flag IS NULL)::FLOAT
+                    / NULLIF(COUNT(*), 0))
+      FROM metrics.customer_metrics
+    warn_threshold: 1.0
+    fail_threshold: 0.99
+  - rule_id: late_payment_flag_validity
+    name: "Late-payment label is binary (0 or 1 only)"
+    dimension: validity
+    check_expression: |
+      SELECT 1.0 - (COUNT(*) FILTER (
+        WHERE late_payment_flag NOT IN (0, 1))::FLOAT
+        / NULLIF(COUNT(*), 0))
+      FROM metrics.customer_metrics
+    warn_threshold: 1.0
+    fail_threshold: 1.0
+  - rule_id: late_payment_flag_base_rate
+    name: "Late-payment rate is within realistic bounds (2%-25%)"
+    dimension: accuracy
+    check_expression: |
+      SELECT CASE
+               WHEN AVG(late_payment_flag::DOUBLE) BETWEEN 0.02 AND 0.25 THEN 1.0
+               ELSE 0.0
+             END
+      FROM metrics.customer_metrics
+    warn_threshold: 1.0
+    fail_threshold: 1.0
+tags:
+  - target_variable
+  - payment_default
+  - revenue_assurance
+  - ml_ready
+version: "1.0"
+status: active

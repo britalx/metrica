@@ -38,11 +38,12 @@ class ModelRunResult(BaseModel):
     test_customers: int
     features_used: list[str]
     features_gated: list[str]
-    churn_rate_train: float
-    churn_rate_test: float
+    churn_rate_train: float  # positive-class rate in train (retained name for back-compat)
+    churn_rate_test: float   # positive-class rate in test (retained name for back-compat)
     evaluation: ModelEvaluation
     feature_importances: list[FeatureImportance]
     dq_gate_threshold: float
+    target_variable: str = "churn_label_30d"
     notes: str = ""
     run_group_id: str | None = None
     is_champion: bool = False

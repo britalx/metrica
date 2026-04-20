@@ -525,6 +525,7 @@ def compute_metrics(conn: duckdb.DuckDBPyConnection):
             monthly_charges   DOUBLE,
             support_calls_30d INTEGER,
             churn_label_30d   INTEGER,
+            late_payment_flag INTEGER,
             avg_monthly_minutes    FLOAT,
             calls_per_day          FLOAT,
             data_usage_gb          FLOAT,
@@ -650,8 +651,97 @@ def compute_metrics(conn: duckdb.DuckDBPyConnection):
         ) app_agg ON c.customer_id = app_agg.customer_id
     """)
 
+    # Populate late_payment_flag with correlated mock labels.
+    # Correlations per user story:
+    #   - low tenure, high overage, month_to_month contracts, infrequent app logins.
+    # Plus ~10% "imperfect" defaulters (long-tenure customers who still default — life events).
+    # Target base rate: 8-12%.
+    conn.execute("SELECT setseed(0.47)")
+    conn.execute("""
+        WITH signals AS (
+            SELECT
+                m.customer_id,
+                m.tenure_months,
+                m.monthly_charges,
+                m.login_app_frequency,
+                c.contract_type,
+                -- Low tenure score: 0..1 where shorter tenure = higher risk
+                CASE
+                    WHEN m.tenure_months IS NULL THEN 0.5
+                    WHEN m.tenure_months < 12 THEN 0.9
+                    WHEN m.tenure_months < 24 THEN 0.6
+                    WHEN m.tenure_months < 60 THEN 0.3
+                    ELSE 0.1
+                END AS tenure_risk,
+                -- High monthly charges proxy for overage risk (no discrete overage field in mock data)
+                CASE
+                    WHEN m.monthly_charges IS NULL THEN 0.3
+                    WHEN m.monthly_charges > 120 THEN 0.8
+                    WHEN m.monthly_charges > 80 THEN 0.5
+                    WHEN m.monthly_charges > 50 THEN 0.3
+                    ELSE 0.15
+                END AS overage_risk,
+                CASE c.contract_type
+                    WHEN 'month_to_month' THEN 0.7
+                    WHEN 'one_year' THEN 0.3
+                    WHEN 'two_year' THEN 0.15
+                    ELSE 0.4
+                END AS contract_risk,
+                -- Low app-login frequency = higher risk
+                CASE
+                    WHEN m.login_app_frequency IS NULL THEN 0.5
+                    WHEN m.login_app_frequency < 0.5 THEN 0.8
+                    WHEN m.login_app_frequency < 2.0 THEN 0.5
+                    WHEN m.login_app_frequency < 5.0 THEN 0.3
+                    ELSE 0.15
+                END AS login_risk
+            FROM metrics.customer_metrics m
+            LEFT JOIN raw.crm_customers c USING (customer_id)
+        ),
+        scored AS (
+            SELECT
+                customer_id,
+                (0.30 * tenure_risk
+                 + 0.30 * overage_risk
+                 + 0.25 * contract_risk
+                 + 0.15 * login_risk) AS risk_score
+            FROM signals
+        )
+        UPDATE metrics.customer_metrics AS m
+        SET late_payment_flag = CASE
+            -- High risk: substantial chance of default
+            WHEN s.risk_score > 0.50 AND random() < 0.60 THEN 1
+            -- Mid risk: moderate chance
+            WHEN s.risk_score > 0.35 AND random() < 0.15 THEN 1
+            -- Low risk: small background rate
+            WHEN s.risk_score <= 0.35 AND random() < 0.04 THEN 1
+            ELSE 0
+        END
+        FROM scored s
+        WHERE m.customer_id = s.customer_id
+    """)
+
+    # Inject "imperfect" defaulters: long-tenure customers flipped to late_payment=1.
+    # These represent life events (hospitalization, job loss) that correlated features can't predict.
+    # Target ~10% of total defaulters to be "imperfect" per the user story.
+    conn.execute("""
+        UPDATE metrics.customer_metrics
+        SET late_payment_flag = 1
+        WHERE customer_id IN (
+            SELECT customer_id FROM metrics.customer_metrics
+            WHERE late_payment_flag = 0
+              AND tenure_months >= 60
+            USING SAMPLE 2%
+        )
+    """)
+
     count = conn.execute("SELECT COUNT(*) FROM metrics.customer_metrics").fetchone()[0]
-    print(f"  metrics.customer_metrics: {count} rows computed")
+    late_count = conn.execute(
+        "SELECT COUNT(*) FROM metrics.customer_metrics WHERE late_payment_flag = 1"
+    ).fetchone()[0]
+    late_rate = late_count / count if count else 0.0
+    print(f"  metrics.customer_metrics: {count} rows computed "
+          f"(late_payment_flag rate: {late_rate:.1%})")
 
 
 def create_dq_tables(conn: duckdb.DuckDBPyConnection):
