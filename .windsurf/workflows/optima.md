@@ -148,6 +148,8 @@ DISCUSSION: #2
 REPO: britalx/iaiai
 AUTHOR: @britalx
 DISCUSSION_ID: <node_id>
+COMMENT_ID: <comment_node_id>
+REPLY_TO_ID: <top_level_comment_id>
 COMMENT_URL: <url>
 ---
 [GitHub Discussion #2: Title]
@@ -158,11 +160,17 @@ Comment body text here
 ```
 
 ### Replying to Discussion Prompts
-After processing a discussion prompt, reply using:
+After processing a discussion prompt, **always use threaded replies** by passing the `REPLY_TO_ID` from the prompt:
 ```bash
-python3 github_discussions.py reply <repo> <discussion_number> "<response>"
+python3 github_discussions.py reply <repo> <discussion_number> "<response>" --reply-to <REPLY_TO_ID>
 ```
-Or use the `--as bot` flag for explicit bot identity.
+This creates a threaded reply under the original comment rather than a new top-level comment.
+
+**Important**: `--reply-to` must be a top-level comment ID. The watcher automatically resolves nested replies to their parent top-level comment in the `REPLY_TO_ID` field.
+
+For long replies, create a temp .py script that reads the reply body from a file and calls `github_discussions.py` programmatically, to avoid PowerShell variable interpolation issues.
+
+Self-posts are always recorded in `self_posts.json` regardless of `--as-bot`.
 
 ### Read Registry & Self-Post Filtering
 The watcher maintains two persistent registries:
@@ -269,7 +277,7 @@ When a task is better handled by a subagent:
 - **Session persistence**: At the end of significant sessions, use `export_session.py` to capture the full context
 - **Cross-post visibility**: Task completions auto-post to the configured Discussion for human visibility
 - **Git-native collaboration**: Use `git_inbox.py` for multi-agent task queues with first-to-push-wins concurrency
-- **For long Discussion replies**: Create a temp .py script file that posts via GraphQL, run it, then delete. Don't inline long text in PowerShell commands ($ variable interpolation issues).
+- **Threaded replies**: Always use `--reply-to <REPLY_TO_ID>` when replying to Discussion prompts. Never post top-level comments as replies.
 
 ## Constraints
 
